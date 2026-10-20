@@ -25,6 +25,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.headers['sec-fetch-site']==='cross-site'||(req.headers.origin&&req.headers.origin!==`http://${req.headers.host}`))return json(res,403,{error:'Same-origin request required'});
     if(pathname==='/api/settings')return json(res,200,await store.updateSettings(await body(req)));
     if(pathname==='/api/collector')return json(res,200,await collector.configure(await body(req)));
+    if(pathname==='/api/drawing-config')return json(res,200,await auto.drawing.configure(await body(req)));
     if(pathname==='/api/credentials')return json(res,200,await auto.configure(await body(req)));
     if(pathname==='/api/capture/sync')return json(res,200,await store.sync());
     const command=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\/(publish|generation)$/);

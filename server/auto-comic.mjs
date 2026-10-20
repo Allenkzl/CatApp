@@ -1,5 +1,6 @@
 import {readFile,writeFile,rename,chmod} from 'node:fs/promises';
 import path from 'node:path';
+import {Seedream} from './seedream.mjs';
 const english=value=>typeof value==='string'&&value.trim()&&value.length<=4000&&/^[\x09\x0a\x0d\x20-\x7e]+$/.test(value);
 export function validateStory(value,work){
  if(!english(value?.title)||!english(value?.summary)||!Array.isArray(value?.panels)||value.panels.length<1||value.panels.length>6)throw new Error('Invalid English storyboard');
@@ -7,20 +8,27 @@ export function validateStory(value,work){
  return {title:value.title,summary:value.summary,panels:value.panels,photoIds:[...work.photoIds],language:'en',storyIsFiction:true,continuousEventVerified:false};
 }
 export class AutoComic {
- constructor(store,{fetchImpl=fetch}={}){this.store=store;this.fetch=fetchImpl;this.key=process.env.DEEPSEEK_API_KEY||'';this.running=null;}
+ constructor(store,{fetchImpl=fetch}={}){this.store=store;this.fetch=fetchImpl;this.drawing=new Seedream(store,{fetchImpl});this.key=process.env.DEEPSEEK_API_KEY||'';this.running=null;}
  async init(){
   try{const value=JSON.parse(await readFile(path.join(this.store.dataDir,'secrets.json'),'utf8'));this.key ||= value.deepseekKey||'';}catch(e){if(e.code!=='ENOENT')throw new Error('Unable to read local API credentials');}
   // A request interrupted by a restart is not blindly resubmitted (it may be billed).
-  for(const w of this.store.index.works)if(w.status==='generating')await this.store.updateJob(w.id,{status:'failed',error:'Service restarted during generation. Retry manually.',retryAt:null});
+  await this.drawing.init();
+  for(const w of this.store.index.works)if(['generating','drawing'].includes(w.status))await this.store.updateJob(w.id,{status:w.status==='drawing'?'image_failed':'failed',error:'Service restarted during generation. Retry manually.',retryAt:null});
   return this;
  }
- snapshot(){return {deepseekConfigured:!!this.key,storyModel:'deepseek-flash',drawingConfigured:false,drawingStatus:'awaiting_provider'};}
+ snapshot(){return {deepseekConfigured:!!this.key,storyModel:'deepseek-flash',...this.drawing.snapshot()};}
  async configure(input){
   if(typeof input?.deepseekKey!=='string'||!/^sk-[A-Za-z0-9_-]{10,200}$/.test(input.deepseekKey)){const e=new Error('Invalid API key');e.statusCode=400;throw e;}
   const file=path.join(this.store.dataDir,'secrets.json');await writeFile(file+'.tmp',JSON.stringify({deepseekKey:input.deepseekKey}),{mode:0o600});await chmod(file+'.tmp',0o600);await rename(file+'.tmp',file);this.key=input.deepseekKey;return this.snapshot();
  }
  tick(){if(this.running)return this.running;this.running=this.run().finally(()=>this.running=null);return this.running;}
+ async draw(work){
+  await this.store.updateJob(work.id,{status:'drawing',error:null,generationStage:'image'});
+  try{const result=await this.drawing.generate(work);await this.store.publish(work.id,result);}
+  catch(e){const message=e.message.startsWith('Seedream request failed')?e.message:e.name==='TimeoutError'?'Seedream timed out. Retry manually to avoid duplicate billing.':'Image generation did not complete. Check drawing configuration or recover the saved output.';await this.store.updateJob(work.id,{status:'image_failed',error:message});}
+ }
  async run(){
+  if(this.drawing.config.apiKey){const next=this.store.index.works.find(w=>w.status==='awaiting_image_provider'&&w.story);if(next)return this.draw(next);}
   if(!this.key)return;
   const work=this.store.index.works.find(w=>w.status==='ready_for_generation'||(w.status==='retry_wait'&&Date.parse(w.retryAt)<=Date.now()));
   if(!work)return;

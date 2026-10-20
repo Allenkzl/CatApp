@@ -13,6 +13,9 @@ DeepSeek 编写故事，绘图接口稍后配置。|DeepSeek writes the story. I
 采集服务通过 SSH 下载照片，网站每两秒同步。关闭网页不影响后台采集。|The collector downloads over SSH. The site syncs every two seconds. Collection continues with the browser closed.
 故事与对白是创作，不能视为连续事件的事实记录。|Stories and dialogue are fictional, not verified records of continuous events.
 猫咪档案中的角色参考和习惯页面的旧版图表仍为演示样例，未关联到实际抓拍。|Cat profiles and legacy habit charts are demo examples, not linked to actual captures.
+DeepSeek 编写英文故事，Seedream 自动绘图。|DeepSeek writes English stories; Seedream illustrates them automatically.
+英文故事与漫画自动生成|English stories and comics generated automatically
+作品保存在本机。DeepSeek 编写英文故事，Seedream 生成手绘漫画。|Diaries are saved locally. DeepSeek writes English stories and Seedream creates illustrated comics.
 未知身份|Unknown identity
 浏览器存储已满或不可用，请先导出作品。|Browser storage is full or unavailable. Please export your work first.
 关闭|Close

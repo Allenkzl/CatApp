@@ -6,7 +6,8 @@ export function validatePublication(work,input){
  if(!work)fail('Unknown capture batch');
  if(!input||typeof input!=='object')fail('Publication payload is required');
  const {metadata,imageBase64}=input;
- if(!metadata||metadata.language!=='en'||metadata.reviewed!==true||metadata.storyIsFiction!==true||metadata.continuousEventVerified!==false)fail('English, reviewed, fictional-story metadata is required');
+ const automatic=metadata?.generationMode==='seedream-api';
+ if(!metadata||metadata.language!=='en'||(metadata.reviewed!==true&&!(automatic&&metadata.reviewed===false))||metadata.storyIsFiction!==true||metadata.continuousEventVerified!==false)fail('English, reviewed, fictional-story metadata is required');
  if(JSON.stringify(metadata.photoIds)!==JSON.stringify(work.photoIds))fail('Source photos must exactly match this batch, in order');
  if(!Array.isArray(metadata.panels)||metadata.panels.length<1||metadata.panels.length>6)fail('One to six panels are required');
  const text=(value,label,max)=>{if(typeof value!=='string'||!value.trim()||value.length>max||!ENGLISH.test(value))fail(`${label} must be nonempty English text`);return value.trim();};
@@ -19,5 +20,5 @@ export function validatePublication(work,input){
  const width=buffer.readUInt32BE(16),height=buffer.readUInt32BE(20);
  if(width<16||height<16||width*height>40000000)fail('PNG dimensions are unsupported');
  const digest=createHash('sha256').update(buffer).digest('hex');
- return {buffer,digest,width,height,metadata:{title,summary,language:'en',photoIds:[...work.photoIds],panels,prompt,reviewed:true,storyIsFiction:true,continuousEventVerified:false,generationMode:'assistant-imagegen',styleVersion:'warm-storybook-en-v1'}};
+ return {buffer,digest,width,height,metadata:{title,summary,language:'en',photoIds:[...work.photoIds],panels,prompt,reviewed:metadata.reviewed,storyIsFiction:true,continuousEventVerified:false,generationMode:automatic?'seedream-api':'assistant-imagegen',...(automatic?{model:text(metadata.model,'Model',120),qualityStatus:metadata.reviewed?'reviewed':'unreviewed'}:{}),styleVersion:'warm-storybook-en-v1'}};
 }

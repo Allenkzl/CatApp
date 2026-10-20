@@ -131,7 +131,8 @@ export class CaptureStore {
  setGeneration(id,input){return this.enqueue(async()=>{
   const work=this.index.works.find(w=>w.id===id);
   if(!work){const error=new Error('Unknown capture batch');error.statusCode=404;throw error;}
-  if(!['ready_for_generation','generating','failed'].includes(input?.status)){const error=new Error('Invalid generation state');error.statusCode=400;throw error;}
+  if(!['ready_for_generation','awaiting_image_provider','generating','failed'].includes(input?.status)){const error=new Error('Invalid generation state');error.statusCode=400;throw error;}
+  if(input.status==='awaiting_image_provider'&&!work.story){const error=new Error('A storyboard is required before drawing');error.statusCode=400;throw error;}
   const next={...work,status:input.status};
   if(input.status==='failed')next.error=String(input.error||'Generation failed. Retry using the same photos.').slice(0,500);else delete next.error;
   const previous=this.index;this.index={...previous,works:previous.works.map(w=>w.id===id?next:w)};
