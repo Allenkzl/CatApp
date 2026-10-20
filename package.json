@@ -1,7 +1,7 @@
 {
   "name": "balcony-cat-observatory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "scripts": {"dev": "node scripts/serve.mjs", "start": "node scripts/serve.mjs", "check": "node --check src/app.js && node --check src/art.js && node --check src/data.js && node --check scripts/serve.mjs"}
+  "scripts": {"dev": "node scripts/serve.mjs", "start": "node scripts/serve.mjs", "check": "node --check src/app.js && node --check src/art.js && node --check src/data.js && node --check src/capture.js && node --check server/capture-store.mjs && node --check scripts/serve.mjs", "test": "node --test tests/capture-store.test.mjs"}
 }

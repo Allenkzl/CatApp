@@ -21,5 +21,11 @@ export const defaults = () => ({
 export const ACTIONS = ['静止休息','移动','食盆区访问','入口停留'];
 export const ZONES = ['入口','休息区','食盆区','通道'];
 export const pages = [
- ['dashboard','grid','工作台'],['observations','camera','观测记录'],['cats','paw','猫咪档案'],['review','check','事件复核'],['insights','chart','习惯与画像'],['studio','spark','漫画工作室'],['library','book','作品库']
+ ['dashboard','grid','工作台'],['observations','camera','观测记录'],['cats','paw','猫咪档案'],
+ // 暂停人工复核入口，保留页面与业务实现供后续恢复。
+ // ['review','check','事件复核'],
+ ['insights','chart','习惯与画像'],
+ // 暂停工作室入口，当前改为每三张抓拍自动排版。
+ // ['studio','spark','漫画工作室'],
+ ['library','book','作品库']
 ];

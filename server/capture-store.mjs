@@ -1,0 +1,102 @@
+import {readdir, readFile, writeFile, mkdir, rename, realpath, stat} from 'node:fs/promises';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {esc} from '../src/art.js';
+
+const hash=value=>createHash('sha256').update(value).digest('hex').slice(0,24);
+const inside=(root,file)=>{const rel=path.relative(root,file);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
+function jpegSize(buffer){
+ if(buffer.length<8||buffer[0]!==255||buffer[1]!==216||buffer.at(-2)!==255||buffer.at(-1)!==217)throw new Error('照片尚未完整写入，或不是 JPEG');
+ let offset=2;
+ while(offset+4<buffer.length){
+  if(buffer[offset++]!==255)throw new Error('JPEG 数据格式不完整');
+  while(buffer[offset]===255)offset++;
+  const marker=buffer[offset++];
+  if(marker===0xda||marker===0xd9)break;
+  if(marker===0x01||(marker>=0xd0&&marker<=0xd7))continue;
+  const length=buffer.readUInt16BE(offset);
+  if(length<2||offset+length>buffer.length)throw new Error('JPEG 数据尚未写完');
+  if([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)){
+   if(length<8)throw new Error('JPEG 尺寸字段无效');
+   const height=buffer.readUInt16BE(offset+3),width=buffer.readUInt16BE(offset+5);
+   if(!height||!width||height*width>60000000)throw new Error('JPEG 尺寸超出支持范围');
+   return {width,height};
+  }
+  offset+=length;
+ }
+ throw new Error('无法读取 JPEG 尺寸');
+}
+function localDate(iso){
+ if(typeof iso!=='string'||!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(iso))throw new Error('缺少含时区的有效拍摄时间');
+ const time=new Date(iso);
+ if(!Number.isFinite(time.getTime()))throw new Error('缺少有效拍摄时间');
+ const parts=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(time);
+ return {date:parts.slice(0,10),time:parts.slice(11,19),capturedAt:time.toISOString()};
+}
+export class CaptureStore {
+ constructor({inputRoot,dataDir}){this.inputRoot=path.resolve(inputRoot);this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[]};this.errors=[];this.status='waiting';this.running=null;}
+ async init(){
+  await mkdir(path.join(this.dataDir,'media'),{recursive:true});
+  try{const saved=JSON.parse(await readFile(path.join(this.dataDir,'captures.json'),'utf8'));if(saved.version!==1||!Array.isArray(saved.photos)||!Array.isArray(saved.works))throw new Error('Invalid capture store');this.index=saved;}
+  catch(error){if(error.code!=='ENOENT')throw new Error('抓拍数据索引损坏，已停止同步以保留原文件。');}
+  await this.sync();return this;
+ }
+ async save(){const file=path.join(this.dataDir,'captures.json');await writeFile(file+'.tmp',JSON.stringify(this.index,null,2));await rename(file+'.tmp',file);}
+ sync(){if(this.running)return this.running;this.running=this.scan().finally(()=>{this.running=null;});return this.running;}
+ async scan(){
+  this.errors=[];let changed=false;
+  let dirs,root;
+  try{root=await realpath(this.inputRoot);dirs=await readdir(root,{withFileTypes:true});this.status='watching';}
+  catch(error){this.status='waiting';this.errors.push(error.code==='ENOENT'?'等待采集目录出现。':'暂时无法读取采集目录。');return this.snapshot();}
+  for(const entry of dirs.sort((a,b)=>a.name.localeCompare(b.name))){
+   if(!entry.isDirectory()||!/^cats-[a-zA-Z0-9-]+$/.test(entry.name))continue;
+   const dir=path.join(root,entry.name);
+   try{
+    const actualDir=await realpath(dir);if(!inside(root,actualDir))throw new Error('批次路径超出采集目录');
+    const manifestPath=await realpath(path.join(dir,'photos.json'));if(!inside(actualDir,manifestPath))throw new Error('清单路径超出批次目录');
+    if((await stat(manifestPath)).size>2000000)throw new Error('批次清单过大');
+    const manifest=JSON.parse(await readFile(manifestPath,'utf8'));if(!Array.isArray(manifest))throw new Error('照片清单格式错误');
+    const records=manifest.slice().sort((a,b)=>String(a?.captured_at).localeCompare(String(b?.captured_at)));
+    for(const record of records){
+     try{
+      if(typeof record?.local_path!=='string')throw new Error('照片清单缺少文件名');
+      // Use only the filename so copied manifests remain portable. Resolve symlinks
+      // and confine every file read to the corresponding capture batch directory.
+      const name=path.basename(record.local_path);
+      if(!/\.jpe?g$/i.test(name)||name.startsWith('.'))throw new Error('照片格式不支持');
+      const photoId=hash(`${entry.name}/${name}`);
+      if(this.index.photos.some(p=>p.id===photoId))continue;
+      const file=await realpath(path.join(actualDir,name));if(!inside(actualDir,file))throw new Error('照片路径超出批次目录');
+      const fileStat=await stat(file);if(!fileStat.isFile()||fileStat.size>30*1024*1024)throw new Error('照片文件大小不支持');
+      const buffer=await readFile(file),dimensions=jpegSize(buffer),when=localDate(record.captured_at);
+      const target=path.join(this.dataDir,'media',photoId+'.jpg');await writeFile(target+'.part',buffer);await rename(target+'.part',target);
+      this.index.photos.push({id:photoId,session:entry.name,name,...when,...dimensions,score:Number.isFinite(record.score)&&record.score>=0&&record.score<=1?record.score:null,url:`/api/capture/photos/${photoId}.jpg`,source:'reCamera',identity:'unknown'});changed=true;
+     }catch(error){this.errors.push(`${entry.name}：${error.code==='ENOENT'?'照片尚未就绪':error.message}`);}
+    }
+   }catch(error){if(error.code!=='ENOENT')this.errors.push(`${entry.name}：${error instanceof SyntaxError?'清单正在更新，稍后重试':error.message}`);}
+  }
+  const assigned=new Set(this.index.works.flatMap(w=>w.photoIds));
+  const groups=new Map();
+  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id)).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt))){const key=photo.session+'/'+photo.date;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(photo);}
+  for(const photos of groups.values())while(photos.length>=3){
+   const batch=photos.splice(0,3),id=hash(batch.map(p=>p.id).join('/')),date=batch[0].date;
+   const ordinal=this.index.works.filter(w=>w.date===date).length+1;
+   this.index.works.push({id,date,title:`每日漫画 · ${date.replaceAll('-','.')} ${ordinal>1?`/ 第 ${ordinal} 篇`:''}`.trim(),photoIds:batch.map(p=>p.id),session:batch[0].session,createdAt:new Date().toISOString(),mode:'photo-layout',status:'completed',comicUrl:`/api/capture/works/${id}.svg`});changed=true;
+  }
+  // Also retry an interrupted index write even if the next scan finds no new files.
+  if(changed||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}
+  return this.snapshot();
+ }
+ snapshot(){
+  const assigned=new Set(this.index.works.flatMap(w=>w.photoIds)),pending=[];
+  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id))){let group=pending.find(g=>g.session===photo.session&&g.date===photo.date);if(!group){group={session:photo.session,date:photo.date,count:0};pending.push(group);}group.count++;}
+  return {...this.index,pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
+ }
+ async photoFile(id){if(!/^[a-f0-9]{24}$/.test(id)||!this.index.photos.some(p=>p.id===id))return null;return path.join(this.dataDir,'media',id+'.jpg');}
+ async comic(id){
+  const work=this.index.works.find(w=>w.id===id);if(!work)return null;
+  const photos=work.photoIds.map(id=>this.index.photos.find(p=>p.id===id));
+  const images=await Promise.all(photos.map(p=>readFile(path.join(this.dataDir,'media',p.id+'.jpg'))));
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1870" viewBox="0 0 1100 1870"><rect width="1100" height="1870" fill="#f7f3e8"/><g font-family="sans-serif" fill="#315543"><text x="550" y="64" text-anchor="middle" font-size="16" letter-spacing="4">THE DAILY CAT DIARY</text><text x="550" y="125" text-anchor="middle" font-size="35">${esc(work.title)}</text><text x="550" y="171" text-anchor="middle" font-size="17">三次快门，收藏今天的三个小瞬间。</text></g>${photos.map((p,i)=>`<g transform="translate(55 ${210+i*505})"><rect width="990" height="480" rx="14" fill="#fffdf7" stroke="#d7ddcd"/><rect x="20" y="20" width="950" height="360" rx="9" fill="#e9eade"/><image href="data:image/jpeg;base64,${images[i].toString('base64')}" x="20" y="20" width="950" height="360" preserveAspectRatio="xMidYMid meet"/><g font-family="sans-serif" fill="#315543"><rect x="36" y="36" width="56" height="38" rx="7" fill="#fffbed"/><text x="64" y="63" text-anchor="middle" font-size="23">0${i+1}</text><text x="28" y="422" font-size="23">${['第一眼，今天的故事开始了。','再看一眼，把这个瞬间留下。','第三次快门，收好今天的小日常。'][i]}</text><text x="28" y="457" font-size="15" fill="#8b987e">${esc(p.date)} ${esc(p.time)} · reCamera 抓拍 · ${esc(p.name)}</text></g></g>`).join('')}<g font-family="sans-serif" fill="#8a987d" font-size="15"><text x="55" y="1770">照片排版版 · 未使用 AI 绘图或行为识别 · 文案为创作，不代表连续行为或个体识别结论。</text><text x="55" y="1810">Open Datalogger × Seeed · 来源批次 ${esc(work.session)}</text></g></svg>`;
+ }
+}
