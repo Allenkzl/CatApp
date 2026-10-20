@@ -2,6 +2,7 @@ import {readdir, readFile, writeFile, mkdir, rename, realpath, stat} from 'node:
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {esc} from '../src/art.js';
+import {htmlFor, translate, workTitle} from '../src/i18n.js';
 
 const hash=value=>createHash('sha256').update(value).digest('hex').slice(0,24);
 const inside=(root,file)=>{const rel=path.relative(root,file);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
@@ -93,10 +94,11 @@ export class CaptureStore {
   return {...this.index,pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
  }
  async photoFile(id){if(!/^[a-f0-9]{24}$/.test(id)||!this.index.photos.some(p=>p.id===id))return null;return path.join(this.dataDir,'media',id+'.jpg');}
- async comic(id){
+ async comic(id, language='zh'){
+  const html=htmlFor(language), t=value=>translate(value,language);
   const work=this.index.works.find(w=>w.id===id);if(!work)return null;
   const photos=work.photoIds.map(id=>this.index.photos.find(p=>p.id===id));
   const images=await Promise.all(photos.map(p=>readFile(path.join(this.dataDir,'media',p.id+'.jpg'))));
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1870" viewBox="0 0 1100 1870"><rect width="1100" height="1870" fill="#f7f3e8"/><g font-family="sans-serif" fill="#315543"><text x="550" y="64" text-anchor="middle" font-size="16" letter-spacing="4">THE DAILY CAT DIARY</text><text x="550" y="125" text-anchor="middle" font-size="35">${esc(work.title)}</text><text x="550" y="171" text-anchor="middle" font-size="17">三次快门，收藏今天的三个小瞬间。</text></g>${photos.map((p,i)=>`<g transform="translate(55 ${210+i*505})"><rect width="990" height="480" rx="14" fill="#fffdf7" stroke="#d7ddcd"/><rect x="20" y="20" width="950" height="360" rx="9" fill="#e9eade"/><image href="data:image/jpeg;base64,${images[i].toString('base64')}" x="20" y="20" width="950" height="360" preserveAspectRatio="xMidYMid meet"/><g font-family="sans-serif" fill="#315543"><rect x="36" y="36" width="56" height="38" rx="7" fill="#fffbed"/><text x="64" y="63" text-anchor="middle" font-size="23">0${i+1}</text><text x="28" y="422" font-size="23">${['第一眼，今天的故事开始了。','再看一眼，把这个瞬间留下。','第三次快门，收好今天的小日常。'][i]}</text><text x="28" y="457" font-size="15" fill="#8b987e">${esc(p.date)} ${esc(p.time)} · reCamera 抓拍 · ${esc(p.name)}</text></g></g>`).join('')}<g font-family="sans-serif" fill="#8a987d" font-size="15"><text x="55" y="1770">照片排版版 · 未使用 AI 绘图或行为识别 · 文案为创作，不代表连续行为或个体识别结论。</text><text x="55" y="1810">Open Datalogger × Seeed · 来源批次 ${esc(work.session)}</text></g></svg>`;
+  return html`<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1870" viewBox="0 0 1100 1870"><rect width="1100" height="1870" fill="#f7f3e8"/><g font-family="sans-serif" fill="#315543"><text x="550" y="64" text-anchor="middle" font-size="16" letter-spacing="4">THE DAILY CAT DIARY</text><text x="550" y="125" text-anchor="middle" font-size="35">${esc(workTitle(work,language))}</text><text x="550" y="171" text-anchor="middle" font-size="17">三次快门，收藏今天的三个小瞬间。</text></g>${photos.map((p,i)=>html`<g transform="translate(55 ${210+i*505})"><rect width="990" height="480" rx="14" fill="#fffdf7" stroke="#d7ddcd"/><rect x="20" y="20" width="950" height="360" rx="9" fill="#e9eade"/><image href="data:image/jpeg;base64,${images[i].toString('base64')}" x="20" y="20" width="950" height="360" preserveAspectRatio="xMidYMid meet"/><g font-family="sans-serif" fill="#315543"><rect x="36" y="36" width="56" height="38" rx="7" fill="#fffbed"/><text x="64" y="63" text-anchor="middle" font-size="23">0${i+1}</text><text x="28" y="422" font-size="23">${esc(t(['第一眼，今天的故事开始了。','再看一眼，把这个瞬间留下。','第三次快门，收好今天的小日常。'][i]))}</text><text x="28" y="457" font-size="15" fill="#8b987e">${esc(p.date)} ${esc(p.time)} · reCamera 抓拍 · ${esc(p.name)}</text></g></g>`).join('')}<g font-family="sans-serif" fill="#8a987d" font-size="15"><text x="55" y="1770">照片排版版 · 未使用 AI 绘图或行为识别 · 文案为创作，不代表连续行为或个体识别结论。</text><text x="55" y="1810">Open Datalogger × Seeed · 来源批次 ${esc(work.session)}</text></g></svg>`;
  }
 }

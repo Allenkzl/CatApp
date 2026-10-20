@@ -1,3 +1,4 @@
+import {html, t} from './i18n.js';
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const icon = (name, size=20) => {
   const paths = {
@@ -24,11 +25,11 @@ export const icon = (name, size=20) => {
     menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
     folder:'<path d="M3 7V4h6l3 3h9v13H3Z"/>',
   };
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.paw}</svg>`;
+  return html`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.paw}</svg>`;
 };
 function cat(x,y,scale=1,dark=false,pose=0) {
   const fur=dark?'#777d70':'#dea15d',stripe=dark?'#4a5149':'#bd7c40';
-  return `<g transform="translate(${x} ${y}) scale(${scale})" stroke="#554d40" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  return html`<g transform="translate(${x} ${y}) scale(${scale})" stroke="#554d40" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M34 61Q90 27 96 65q2 18-25 12" stroke="${stripe}" stroke-width="13" fill="none"/>
     <ellipse cx="21" cy="58" rx="35" ry="27" fill="${fur}"/>
     ${pose%3===1?'<path d="M-5 76H9m21 0h16" stroke-width="8"/>':'<path d="M-1 68v15m27-15v15" stroke-width="9"/>'}
@@ -40,9 +41,9 @@ function cat(x,y,scale=1,dark=false,pose=0) {
     <path d="M-9 57q15 14 29 0" fill="#f6e9d2" stroke="none"/>
   </g>`;
 }
-export function balconyScene(mode=0, dark=false, palette='手账水彩') {
+export function balconyScene(mode=0, dark=false, palette=t('手账水彩')) {
   const bg=palette==='复古版画'?'#e6debf':palette==='清新线稿'?'#e8f0ea':'#f3e6c9';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 280" role="img" aria-label="模拟阳台猫咪插画"><defs><pattern id="grain${mode}" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".5" fill="#8b7858" opacity=".12"/></pattern></defs>
+  return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 280" role="img" aria-label="模拟阳台猫咪插画"><defs><pattern id="grain${mode}" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".5" fill="#8b7858" opacity=".12"/></pattern></defs>
     <rect width="500" height="280" fill="${bg}"/><circle cx="403" cy="60" r="35" fill="#e6bf68" opacity=".55"/>
     <path d="M0 122H500M0 133H500M35 122v109m57-109v109m57-109v109m57-109v109m57-109v109m57-109v109m57-109v109m57-109v109m57-109v109" stroke="#788b75" stroke-width="5" opacity=".55"/>
     <path d="M0 231H500V280H0Z" fill="#dfcfb3"/><path d="M0 253H500M80 231 45 280m155-49-12 49m140-49 14 49m101-49 35 49" stroke="#bbae93" opacity=".6"/>
@@ -54,9 +55,9 @@ export function balconyScene(mode=0, dark=false, palette='手账水彩') {
   </svg>`;
 }
 export function mapArt() {
- return `<svg viewBox="0 0 580 240" role="img" aria-label="模拟阳台区域示意，虚线路径为演示轨迹"><defs><pattern id="tiles" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" stroke="#dcded4" fill="none"/></pattern></defs><rect x="10" y="10" width="560" height="215" rx="12" fill="#f1f0e7" stroke="#d4d9cd"/><rect x="10" y="10" width="560" height="215" rx="12" fill="url(#tiles)"/><rect x="28" y="27" width="130" height="66" rx="10" fill="#e2e8d7"/><rect x="397" y="28" width="150" height="70" rx="10" fill="#e7e1ce"/><rect x="406" y="155" width="140" height="50" rx="9" fill="#e0e7df"/><path d="M35 222v-55h60v55" fill="#ddcbbb"/><g fill="#6f7a61"><circle cx="200" cy="38" r="12"/><circle cx="242" cy="38" r="12"/><circle cx="284" cy="38" r="12"/><circle cx="326" cy="38" r="12"/></g><g font-family="sans-serif" font-size="13" fill="#7b8172"><text x="66" y="66">休息区</text><text x="450" y="66">食盆区</text><text x="450" y="185">入口</text><text x="260" y="204">通 道</text></g><path d="M470 175C390 165 350 110 260 125S150 175 104 65" stroke="#ca9654" stroke-width="3" stroke-dasharray="6 6" fill="none"/><path d="M115 61C180 91 240 93 310 68S410 88 467 65" stroke="#688579" stroke-width="3" stroke-dasharray="6 6" fill="none"/><circle cx="260" cy="125" r="16" fill="#dba05c"/><circle cx="310" cy="68" r="16" fill="#6e897b"/><g fill="white" font-size="12" font-family="sans-serif" text-anchor="middle"><text x="260" y="130">橘</text><text x="310" y="73">芝</text></g></svg>`;
+ return html`<svg viewBox="0 0 580 240" role="img" aria-label="模拟阳台区域示意，虚线路径为演示轨迹"><defs><pattern id="tiles" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" stroke="#dcded4" fill="none"/></pattern></defs><rect x="10" y="10" width="560" height="215" rx="12" fill="#f1f0e7" stroke="#d4d9cd"/><rect x="10" y="10" width="560" height="215" rx="12" fill="url(#tiles)"/><rect x="28" y="27" width="130" height="66" rx="10" fill="#e2e8d7"/><rect x="397" y="28" width="150" height="70" rx="10" fill="#e7e1ce"/><rect x="406" y="155" width="140" height="50" rx="9" fill="#e0e7df"/><path d="M35 222v-55h60v55" fill="#ddcbbb"/><g fill="#6f7a61"><circle cx="200" cy="38" r="12"/><circle cx="242" cy="38" r="12"/><circle cx="284" cy="38" r="12"/><circle cx="326" cy="38" r="12"/></g><g font-family="sans-serif" font-size="13" fill="#7b8172"><text x="66" y="66">休息区</text><text x="450" y="66">食盆区</text><text x="450" y="185">入口</text><text x="260" y="204">通 道</text></g><path d="M470 175C390 165 350 110 260 125S150 175 104 65" stroke="#ca9654" stroke-width="3" stroke-dasharray="6 6" fill="none"/><path d="M115 61C180 91 240 93 310 68S410 88 467 65" stroke="#688579" stroke-width="3" stroke-dasharray="6 6" fill="none"/><circle cx="260" cy="125" r="16" fill="#dba05c"/><circle cx="310" cy="68" r="16" fill="#6e897b"/><g fill="white" font-size="12" font-family="sans-serif" text-anchor="middle"><text x="260" y="130">橘</text><text x="310" y="73">芝</text></g></svg>`;
 }
 export function activityChart() {
  const a=[18,12,24,36,59,44,19,23,39,56,41,25], b=[8,13,16,24,35,23,12,37,48,28,19,13];
- return `<svg class="activity-svg" viewBox="0 0 650 180" role="img" aria-label="模拟每小时活动分布图"><g stroke="#eceee7" stroke-dasharray="3 4">${[25,65,105,145].map(y=>`<path d="M30 ${y}H640"/>`).join('')}</g><g fill="#9caa9b" font-size="10" font-family="sans-serif"><text x="2" y="28">60m</text><text x="2" y="108">20m</text>${a.map((_,i)=>`<text x="${44+i*49}" y="173">${String(i+7).padStart(2,'0')}</text>`).join('')}</g>${a.map((v,i)=>`<rect x="${42+i*49}" y="${145-v*1.7}" width="12" height="${v*1.7}" rx="3" fill="#d5a66b"/><rect x="${57+i*49}" y="${145-b[i]*1.7}" width="12" height="${b[i]*1.7}" rx="3" fill="#739385"/>`).join('')}</svg>`;
+ return html`<svg class="activity-svg" viewBox="0 0 650 180" role="img" aria-label="模拟每小时活动分布图"><g stroke="#eceee7" stroke-dasharray="3 4">${[25,65,105,145].map(y=>html`<path d="M30 ${y}H640"/>`).join('')}</g><g fill="#9caa9b" font-size="10" font-family="sans-serif"><text x="2" y="28">${t('60 分钟')}</text><text x="2" y="108">${t('20 分钟')}</text>${a.map((_,i)=>html`<text x="${44+i*49}" y="173">${String(i+7).padStart(2,'0')}</text>`).join('')}</g>${a.map((v,i)=>html`<rect x="${42+i*49}" y="${145-v*1.7}" width="12" height="${v*1.7}" rx="3" fill="#d5a66b"/><rect x="${57+i*49}" y="${145-b[i]*1.7}" width="12" height="${b[i]*1.7}" rx="3" fill="#739385"/>`).join('')}</svg>`;
 }

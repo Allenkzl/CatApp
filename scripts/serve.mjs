@@ -11,7 +11,8 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 const json=(res,code,value)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
 const server=http.createServer(async(req,res)=>{
  try{
-  const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+  const requestURL=new URL(req.url,'http://localhost');
+  const pathname=decodeURIComponent(requestURL.pathname);
   if(pathname.startsWith('/api/')){
    if(!['GET','POST'].includes(req.method))return json(res,405,{error:'Method not allowed'});
    if(req.method==='POST'){
@@ -23,7 +24,7 @@ const server=http.createServer(async(req,res)=>{
    const photo=pathname.match(/^\/api\/capture\/photos\/([a-f0-9]{24})\.jpg$/);
    const comic=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\.svg$/);
    if(photo){const file=await store.photoFile(photo[1]);if(!file)return json(res,404,{error:'Photo not found'});res.writeHead(200,{'Content-Type':'image/jpeg','X-Content-Type-Options':'nosniff'});res.end(await readFile(file));return;}
-   if(comic){const svg=await store.comic(comic[1]);if(svg===null)return json(res,404,{error:'Work not found'});res.writeHead(200,{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(svg);return;}
+   if(comic){const svg=await store.comic(comic[1],requestURL.searchParams.get('lang')==='en'?'en':'zh');if(svg===null)return json(res,404,{error:'Work not found'});res.writeHead(200,{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(svg);return;}
    return json(res,404,{error:'Not found'});
   }
   const target=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname)),relative=path.relative(root,target);
