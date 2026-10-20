@@ -17,9 +17,9 @@ Open Datalogger 阳台猫工作台。当前主流程为读取 reCamera 电脑端
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`feature/continuous-auto-comic`，持续 SSH 采集、可调组图、DeepSeek 英文故事与 Seedream 自动绘图已接入；本轮手机3张照片已成第二篇故事，绘图真实请求 ModelNotOpen，等待用户开通模型，未完成两篇漫画图片验收。
+- 活跃分支：`feature/continuous-auto-comic`，持续 SSH 采集、可调组图、DeepSeek 英文故事与 Seedream 自动绘图已接入；本轮手机3张照片已成第二篇故事；用户开通 Seedream 5.0 Flash 后，两篇全英文漫画均已生成并回填，等待用户查看效果与确认合并。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
-- 新流程：实际抓拍自动同步、同批次同天三张组图、每日漫画与原图回看、离线 SVG 下载；旧事件和作品保留，review/studio 导航注释且路由暂停。
+- 新流程：持续真实抓拍、同摄像头同北京日期按 N 张组图、DeepSeek 英文故事、Seedream 英文手绘漫画、原图回看和 PNG 下载；两篇2560×1440真实绘图已生成。旧事件和作品保留，review/studio 导航注释且路由暂停。
 
 ## 重要约定
 - 全站语言通过右上角切换，默认中文，独立存储键 `catapp-language` 记住选择；`src/messages.js` 为本地词典，`src/i18n.js` 的 `html` 标签只翻译模板静态部分。用户输入、原始照片文件名、批次和目录保留原文；已知默认演示字段仅在展示时翻译，保存未改字段时保留原始值。
@@ -41,7 +41,7 @@ Open Datalogger 阳台猫工作台。当前主流程为读取 reCamera 电脑端
 - `.data/secrets.json` / `seedream-config.json` / `collector-config.json` 为0600本机私有凭据，不返回API、不可提交或分享。`npm run test:camera` 验证出现/离开/周期补拍，`node scripts/verify-auto.mjs` 验证隔离UI流程。运行说明见 `docs/COMIC_GENERATION.md`。
 - 本分支从 main 保留双语界面，移植 `df73ac3` 的手绘发布模块并适配任意数量；原独立手绘工作区4174仍保留，当前集成版使用4173。
 
-- `server/seedream.mjs` 为固定官方 Ark 接口适配；默认模型 `doubao-seedream-5-0-pro-260628`，设置页支持模型 ID 或 ep 接入点；ModelNotOpen 需账户开通。绘图无自动重试，超时/重启需人工确认后重试；已返回PNG先缓存，发布失败不重付费。自动发布元数据准确记录 seedream-api、模型和未人工审核状态。
+- `server/seedream.mjs` 为固定官方 Ark 接口适配；代码缺省模型 `doubao-seedream-5-0-pro-260628`；本机实际配置为用户已开通的 `doubao-seedream-5-0-flash-260915`，两篇已成功。设置页支持模型 ID 或 ep 接入点；ModelNotOpen 需账户开通。绘图无自动重试，超时/重启需人工确认后重试；已返回PNG先缓存，发布失败不重付费。自动发布元数据准确记录 seedream-api、模型和未人工审核状态。
 
 ## 变更日志
 | 日期 | 分支 | 说明 |
@@ -53,3 +53,4 @@ Open Datalogger 阳台猫工作台。当前主流程为读取 reCamera 电脑端
 | 2026-10-20 | main | 合并 feature/bilingual-ui（包含此前网站原型和真实抓拍功能），全站中英文切换及双语 SVG 进入主分支。 |
 | 2026-10-20 | feature/continuous-auto-comic | 新增持续 SSH 采集器、默认3张可配置组图、冻结当前组、DeepSeek 自动英文故事、作品库等待绘图状态与本机私有配置；已通过隔离验证及真实故事调用，已连接摄像头持续监听，待手机新抓拍验收。 |
 | 2026-10-20 | feature/continuous-auto-comic | 接入 Seedream 多图参考英文漫画、设置页私有配置与绘图单独重试；28项测试及隔离浏览器通过，真实两篇请求均 ModelNotOpen，等待账户开通后生成验收。 |
+| 2026-10-20 | feature/continuous-auto-comic | 用户开通并切换 Seedream 5.0 Flash（260915），已有两篇英文故事均生成2560×1440三格漫画并入库；已看图核对英文和画风，作品保留自动生成未人工审核标记。 |
