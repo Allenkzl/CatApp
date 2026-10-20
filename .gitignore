@@ -3,3 +3,8 @@ node_modules/
 artifacts/
 *.log
 .data/
+
+__pycache__/
+*.pyc
+.env
+.env.*

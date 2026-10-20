@@ -1,5 +1,18 @@
 // Canonical Chinese copy and its English presentation. Business values stay unchanged.
 export const messages = Object.fromEntries(`
+收齐设定数量后，自动编写英文故事。|Once a group is full, its English story is written automatically.
+同摄像头同一天，按设置组图|Grouped by camera, day and configured count
+英文故事自动生成，手绘待接入|Automatic English story; illustration pending
+照片收齐后，英文故事会自动进入作品库。|When photos are ready, their English story enters the library automatically.
+DeepSeek 编写故事，绘图接口稍后配置。|DeepSeek writes the story. Illustration API will be added later.
+照片达到设置数量后，自动进入故事队列。|Photos enter the story queue when the configured count is reached.
+照片按设定数量进入作品库；不推断身份、持续时长或轨迹。|Photos enter the library at the configured count. Identity, duration and paths are not inferred.
+收集照片，编写全英文故事，保留手绘漫画的位置。|Collect photos, write English stories, and make room for illustrated comics.
+作品保存在本机。英文故事由 DeepSeek 编写，手绘图片等待绘图接口。|Diaries are saved locally. DeepSeek writes English stories; illustration awaits an image API.
+收齐设定数量的照片后，作品会自动出现在这里。|Your diary appears here when the configured number of photos is collected.
+采集服务通过 SSH 下载照片，网站每两秒同步。关闭网页不影响后台采集。|The collector downloads over SSH. The site syncs every two seconds. Collection continues with the browser closed.
+故事与对白是创作，不能视为连续事件的事实记录。|Stories and dialogue are fictional, not verified records of continuous events.
+猫咪档案中的角色参考和习惯页面的旧版图表仍为演示样例，未关联到实际抓拍。|Cat profiles and legacy habit charts are demo examples, not linked to actual captures.
 未知身份|Unknown identity
 浏览器存储已满或不可用，请先导出作品。|Browser storage is full or unavailable. Please export your work first.
 关闭|Close
