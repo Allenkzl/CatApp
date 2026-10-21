@@ -36,7 +36,7 @@ function localDate(iso){
  return {date:parts.slice(0,10),time:parts.slice(11,19),capturedAt:time.toISOString()};
 }
 export class CaptureStore {
- constructor({inputRoot,dataDir}){this.inputRoot=path.resolve(inputRoot);this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
+ constructor({inputRoot,dataDir}){this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
  async init(){
   await mkdir(path.join(this.dataDir,'media'),{recursive:true});
   await mkdir(path.join(this.dataDir,'comics'),{recursive:true});
@@ -53,6 +53,7 @@ export class CaptureStore {
  sync(){if(this.running)return this.running;this.running=this.enqueue(()=>this.scan()).finally(()=>{this.running=null;});return this.running;}
  async scan(){
   this.errors=[];let changed=false;
+  if(!this.inputRoot){this.status='direct';if(this.groupUnassigned()||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}return this.snapshot();}
   let dirs,root;
   try{root=await realpath(this.inputRoot);dirs=await readdir(root,{withFileTypes:true});this.status='watching';}
   catch(error){this.status='waiting';this.errors.push(error.code==='ENOENT'?'等待采集目录出现。':'暂时无法读取采集目录。');return this.snapshot();}
@@ -83,6 +84,13 @@ export class CaptureStore {
     }
    }catch(error){if(error.code!=='ENOENT')this.errors.push(`${entry.name}：${error instanceof SyntaxError?'清单正在更新，稍后重试':error.message}`);}
   }
+  changed=this.groupUnassigned()||changed;
+  // Also retry an interrupted index write even if the next scan finds no new files.
+  if(changed||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}
+  return this.snapshot();
+ }
+ groupUnassigned(){
+  let changed=false;
   const assigned=new Set(this.index.works.flatMap(w=>w.photoIds));
   const groups=new Map();
   for(const photo of this.index.photos.filter(p=>!assigned.has(p.id)).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt))){
@@ -99,9 +107,7 @@ export class CaptureStore {
    }
    if(!photos.length)this.index.groups=this.index.groups.filter(g=>g.key!==key);
   }
-  // Also retry an interrupted index write even if the next scan finds no new files.
-  if(changed||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}
-  return this.snapshot();
+  return changed;
  }
  snapshot(){
   const assigned=new Set(this.index.works.flatMap(w=>w.photoIds)),pending=[];
@@ -112,6 +118,21 @@ export class CaptureStore {
   }
   return {...this.index,pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
  }
+ ingestUpload(deviceId,metadata,buffer){return this.enqueue(async()=>{
+  const bad=message=>{const e=new Error(message);e.statusCode=400;throw e;};
+  if(typeof metadata.photoId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(metadata.photoId))bad('Invalid photo ID');
+  if(!Buffer.isBuffer(buffer)||buffer.length>30*1024*1024)bad('JPEG must be at most 30 MB');
+  let dimensions,when;try{dimensions=jpegSize(buffer);when=localDate(metadata.capturedAt);}catch(e){bad(e.message);}
+  const id=hash('upload/'+deviceId+'/'+metadata.photoId),contentHash=createHash('sha256').update(buffer).digest('hex');
+  const existing=this.index.photos.find(p=>p.id===id);
+  if(existing){if(existing.contentHash!==contentHash||existing.capturedAt!==when.capturedAt){const e=new Error('Photo ID already exists with different content or capture time');e.statusCode=409;throw e;}if(this.unsaved){await this.save();this.unsaved=false;}return {photoId:id,duplicate:true};}
+  const file=path.join(this.dataDir,'media',id+'.jpg');await writeFile(file+'.part',buffer);await rename(file+'.part',file);
+  const previous=this.index;this.index=structuredClone(previous);
+  this.index.photos.push({id,cameraId:deviceId,externalId:metadata.photoId,name:metadata.photoId+'.jpg',session:'device-'+deviceId,...when,...dimensions,contentHash,score:null,url:`/api/capture/photos/${id}.jpg`,source:'reCamera direct upload',identity:'unknown'});
+  this.groupUnassigned();
+  try{await this.save();}catch(e){this.index=previous;throw e;}
+  return {photoId:id,duplicate:false};
+ });}
  updateSettings(input){return this.enqueue(async()=>{
   if(!Number.isInteger(input?.batchPhotoCount)||input.batchPhotoCount<1||input.batchPhotoCount>12){const e=new Error('Photo count must be an integer from 1 to 12');e.statusCode=400;throw e;}
   const previous=this.index.settings;this.index.settings={batchPhotoCount:input.batchPhotoCount};
