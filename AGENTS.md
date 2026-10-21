@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`feature/device-upload-deployment`，基于完整漫画版本新增设备直传、服务器登录/配置与交付文档；已创建并推送私有仓库 https://github.com/Allenkzl/CatApp ，默认分支为本功能分支；保留本地main，未合并。
+- 活跃分支：`feature/device-upload-deployment`，基于完整漫画版本新增设备直传、服务器登录/配置、Docker部署文件与交付文档；已创建并推送私有仓库 https://github.com/Allenkzl/CatApp ，默认分支为本功能分支；保留本地main，未合并。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：持续真实抓拍、同摄像头同北京日期按 N 张组图、DeepSeek 英文故事、Seedream 英文手绘漫画、原图回看和 PNG 下载；两篇2560×1440真实绘图已生成。旧事件和作品保留，review/studio 导航注释且路由暂停。
 
@@ -46,9 +46,10 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `CAT_MODE=server` 必须配置 `CAT_PUBLIC_URL` 与至少12字符管理员密码；监听0.0.0.0，服务器模式不读取SSH配置、不扫描桌面目录。公开部署需HTTPS反代保持Host及持久化CAT_DATA_DIR，单进程使用数据目录。
 - `server/access.mjs` 管理8小时HttpOnly会话、登录限次、独立设备Bearer凭证；`devices.json` 仅存设备凭证哈希。设备凭证不能管理网站。上传图片走POST /api/device/photos，原始JPEG及固定photoId/带时区时间；重复同内容ACK、冲突409。
 - `scripts/recamera/upload_to_website.py` 直接在设备检测/拍照/上传，独立outbox、网络补传、最多100张待传；共享旧采集锁，不修改模型/GPIO。首次部署可用SSH，日常传输为HTTP/HTTPS。凭证不随重定向发送。
-- 2026-10-21现场：新设备192.168.50.94已验证root/Python3.11.6/websockets10.4，完成单张真实抓拍→局域网后台直传；新完整三张猫照片现场生成仍待用户测试。独立直传测试站 http://192.168.50.109:4180，数据 `.data/device-live`；旧4173与原两篇漫画保留。测试登录信息仅在忽略的 `.data/server-login.txt`。
+- 2026-10-21现场：新设备192.168.50.94已验证root/Python3.11.6/websockets10.4，完成单张真实抓拍→局域网后台直传；用户随后反馈完整流程测试成功；正式服务器仍须重新验收。独立直传测试站 http://192.168.50.109:4180，数据 `.data/device-live`；旧4173与原两篇漫画保留。测试登录信息仅在忽略的 `.data/server-login.txt`。
 - 本轮最终验证：33项Node测试、6项Python设备测试、服务器与原本地模式桌面/移动浏览器流程均通过；未用模拟测试冒充新设备三张猫的现场生成验收。
-- 本轮不制作Docker镜像、不部署公网网站、不安装系统开机项；交付说明见README与docs/DEVICE_UPLOAD.md。`.env.example` 仅含占位值，可提交；所有真实凭证、运行照片、登录信息仍在忽略目录。
+- Docker交付：Dockerfile使用node:22-bookworm-slim，非root1000:1000，Compose将服务器专用数据目录绑定到/app/data，默认仅本机端口且关闭付费生成；上线需显式开启。说明见docs/OPS_HANDOFF.md与docs/OPS_MESSAGE.md，Docker模板用deploy/.env.example。
+- 本机无Docker Engine/CLI，本轮只交付构建/运行文件和隔离容器验证脚本，未声称已构建镜像或验证容器；公网、设备守护及正式验收由运维部署阶段执行。交付说明见README与docs/DEVICE_UPLOAD.md。`.env.example` 仅含占位值，可提交；所有真实凭证、运行照片、登录信息仍在忽略目录。
 
 ## 变更日志
 | 日期 | 分支 | 说明 |
@@ -62,3 +63,4 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-20 | feature/continuous-auto-comic | 接入 Seedream 多图参考英文漫画、设置页私有配置与绘图单独重试；28项测试及隔离浏览器通过，真实两篇请求均 ModelNotOpen，等待账户开通后生成验收。 |
 | 2026-10-20 | feature/continuous-auto-comic | 用户开通并切换 Seedream 5.0 Flash（260915），已有两篇英文故事均生成2560×1440三格漫画并入库；已看图核对英文和画风，作品保留自动生成未人工审核标记。 |
 | 2026-10-21 | feature/device-upload-deployment | 新增HTTP设备直传、串行幂等入库、服务器登录及设备凭证、独立目录配置、接入与交付说明；新相机真实单张上传成功，33项后端与6项设备测试及双模式浏览器通过；私有GitHub仓库已推送，完整三张现场验收待用户测试。 |
+| 2026-10-21 | feature/device-upload-deployment | 用户确认业务测试成功；新增Dockerfile、Compose、环境模板、Nginx示例、隔离容器检查与运维部署/备份/回滚说明，本机无Docker未执行构建或容器验收。 |
