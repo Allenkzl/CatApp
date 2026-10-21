@@ -17,5 +17,11 @@ try{
  await stop();loginRequired=false;await start();await page.context().clearCookies();
  assert.equal((await fetch(base+'/api/capture')).status,200);assert.equal((await fetch(base+'/login',{redirect:'manual'})).status,303);assert.equal((await fetch(base+'/api/device/photos',{method:'POST'})).status,401);
  await page.goto(base+'/#dashboard');await page.waitForSelector('#app .sidebar');await page.waitForFunction(()=>!document.querySelector('form[action="/logout"]'));assert.equal(await page.locator('[name=password]').count(),0);assert.deepEqual(errors,[]);
- console.log('PASS: optional no-login mode and default login,  cookie, admin/device isolation, CSRF, private-source denial, direct JPEG upload, duplicate ACK, one group, device status, restart recovery, desktop/mobile UI');
+ let pollCount=0;const visible=structuredClone(state);visible.requireLogin=false;
+ await page.route('**/api/capture',async route=>{pollCount++;const snapshot=structuredClone(visible);snapshot.devices=(snapshot.devices||[]).map(d=>({...d,updatedAt:new Date().toISOString()}));snapshot.collector.updatedAt=new Date().toISOString();await route.fulfill({json:snapshot});});
+ await page.goto(base+'/#library');await page.waitForSelector('[data-work-status="ready_for_generation"]');
+ await page.evaluate(()=>{window.stableMain=document.querySelector('#main-content');window.stableImage=document.querySelector('#app img');});
+ const initialPolls=pollCount;await page.waitForTimeout(7500);assert.ok(pollCount>=initialPolls+2);assert.equal(await page.evaluate(()=>document.querySelector('#main-content')===window.stableMain&&window.stableMain.isConnected&&(!window.stableImage||window.stableImage.isConnected)),true);
+ visible.works[0].status='generating';await page.waitForSelector('[data-work-status="generating"]',{timeout:7000});assert.deepEqual(errors,[]);
+ console.log('PASS: stable DOM across heartbeat-only polls, live work updates, optional no-login mode and default login,  cookie, admin/device isolation, CSRF, private-source denial, direct JPEG upload, duplicate ACK, one group, device status, restart recovery, desktop/mobile UI');
 }finally{await browser?.close();if(child)await stop();await rm(data,{recursive:true,force:true});}
