@@ -22,6 +22,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - 新流程：持续真实抓拍、同摄像头同北京日期按 N 张组图、DeepSeek 英文故事、Seedream 英文手绘漫画、原图回看和 PNG 下载；两篇2560×1440真实绘图已生成。旧事件和作品保留，review/studio 导航注释且路由暂停。
 
 ## 重要约定
+- 用户要求当前局域网测试站免登录：`.data/server-local-env.json` 设置 `CAT_REQUIRE_LOGIN=false`，服务器模式仍使用设备上传凭证。默认服务器与Docker部署仍需管理员登录；API快照requireLogin控制退出按钮。
 - 全站语言通过右上角切换，默认中文，独立存储键 `catapp-language` 记住选择；`src/messages.js` 为本地词典，`src/i18n.js` 的 `html` 标签只翻译模板静态部分。用户输入、原始照片文件名、批次和目录保留原文；已知默认演示字段仅在展示时翻译，保存未改字段时保留原始值。
 - 每日漫画 SVG 接口支持 `?lang=en` / `?lang=zh`（默认中文），按请求生成，不修改作品索引和原图；修改该接口后需重启本地 Node 服务。
 - 本轮已授权本机 Node 监督独立 SSH 采集器，并调用 DeepSeek 官方看图接口编写故事；不操作 GPIO、不修改原 reCamera 项目，不向外部平台发布。用户已授权 Ark / Seedream 付费绘图，自动图片明确未人工审核；不能把接口失败或等待状态标成漫画已完成。
@@ -64,3 +65,4 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-20 | feature/continuous-auto-comic | 用户开通并切换 Seedream 5.0 Flash（260915），已有两篇英文故事均生成2560×1440三格漫画并入库；已看图核对英文和画风，作品保留自动生成未人工审核标记。 |
 | 2026-10-21 | feature/device-upload-deployment | 新增HTTP设备直传、串行幂等入库、服务器登录及设备凭证、独立目录配置、接入与交付说明；新相机真实单张上传成功，33项后端与6项设备测试及双模式浏览器通过；私有GitHub仓库已推送，完整三张现场验收待用户测试。 |
 | 2026-10-21 | feature/device-upload-deployment | 用户确认业务测试成功；新增Dockerfile、Compose、环境模板、Nginx示例、隔离容器检查与运维部署/备份/回滚说明，本机无Docker未执行构建或容器验收。 |
+| 2026-10-21 | feature/device-upload-deployment | 新增显式测试免登录开关，当前4180测试站直接进入；默认部署登录和设备鉴权保留。 |

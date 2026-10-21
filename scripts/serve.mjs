@@ -26,7 +26,7 @@ const server=http.createServer(async(req,res)=>{
   const expected=config.origin||'http://'+host;
   if(req.method==='POST'&&(req.headers['sec-fetch-site']==='cross-site'||(req.headers.origin&&req.headers.origin!==expected)))return json(res,403,{error:'Same-origin request required'});
   if(pathname==='/login'){
-   if(!config.server){res.writeHead(303,{Location:'/'}).end();return;}
+   if(!config.server||!config.requireLogin){res.writeHead(303,{Location:'/'}).end();return;}
    if(req.method==='GET'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}).end(loginPage());return;}
    if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
    const data=new URLSearchParams((await bytes(req,4096)).toString('utf8')),result=access.login(req,data.get('username')||'',data.get('password')||'');
@@ -59,7 +59,7 @@ const server=http.createServer(async(req,res)=>{
     if(command){const input=await body(req);return json(res,200,await (command[2]==='publish'?store.publish(command[1],input):store.setGeneration(command[1],input)));}
     return json(res,405,{error:'Method not allowed'});
    }
-   if(pathname==='/api/capture')return json(res,200,{...store.snapshot(),mode:config.mode,devices:access.snapshot(),automation:auto.snapshot(),collector:config.server?{state:'direct_upload',online:access.snapshot().some(d=>d.online)}:collector.snapshot()});
+   if(pathname==='/api/capture')return json(res,200,{...store.snapshot(),mode:config.mode,requireLogin:config.requireLogin,devices:access.snapshot(),automation:auto.snapshot(),collector:config.server?{state:'direct_upload',online:access.snapshot().some(d=>d.online)}:collector.snapshot()});
    const photo=pathname.match(/^\/api\/capture\/photos\/([a-f0-9]{24})\.jpg$/),comic=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\.svg$/),art=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\/artwork\/([a-f0-9]{64})\.png$/);
    if(art||photo){const file=art?await store.artworkFile(art[1],art[2]):await store.photoFile(photo[1]);if(!file)return json(res,404,{error:'Image not found'});res.writeHead(200,{'Content-Type':art?'image/png':'image/jpeg','Cache-Control':'private, no-store'}).end(await readFile(file));return;}
    if(comic){const svg=await store.comic(comic[1],requestURL.searchParams.get('lang')==='en'?'en':'zh');if(svg===null)return json(res,404,{error:'Work not found'});res.writeHead(200,{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'no-cache','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"}).end(svg);return;}

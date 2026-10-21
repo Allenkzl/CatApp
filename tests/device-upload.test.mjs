@@ -10,3 +10,10 @@ test('a rotated persisted device credential is not reverted by an initial enviro
  const {root}=await setup(t),previousToken=process.env.CAT_DEVICE_TOKEN,previousId=process.env.CAT_DEVICE_ID;
  try{process.env.CAT_DEVICE_TOKEN='test-initial-environment-token-only';process.env.CAT_DEVICE_ID='camera-seed';const config={dataDir:root,server:true};const access=await new Access(config).init();const rotated=await access.register('camera-seed');const restored=await new Access(config).init();assert.equal(restored.device({headers:{authorization:'Bearer '+rotated.token}}).id,'camera-seed');assert.equal(restored.device({headers:{authorization:'Bearer '+process.env.CAT_DEVICE_TOKEN}}),null);}finally{if(previousToken===undefined)delete process.env.CAT_DEVICE_TOKEN;else process.env.CAT_DEVICE_TOKEN=previousToken;if(previousId===undefined)delete process.env.CAT_DEVICE_ID;else process.env.CAT_DEVICE_ID=previousId;}
 });
+
+
+test('server test mode can explicitly skip admin login without bypassing device credentials',async t=>{
+ const {root}=await setup(t),config=runtimeConfig('/tmp',{CAT_MODE:'server',CAT_PUBLIC_URL:'http://example.test',CAT_REQUIRE_LOGIN:'false',CAT_DATA_DIR:root});
+ assert.equal(config.requireLogin,false);const access=await new Access(config).init();assert.equal(access.authorized({headers:{}}),true);assert.equal(access.device({headers:{}}),null);
+ assert.throws(()=>runtimeConfig('/tmp',{CAT_REQUIRE_LOGIN:'no'}),/CAT_REQUIRE_LOGIN/);
+});
