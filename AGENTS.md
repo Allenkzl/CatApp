@@ -78,4 +78,4 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-26 | feature/device-upload-deployment | 按用户明确要求整理近期修改和排障记录并同步GitHub；新增docs/OPERATIONS_STATUS.md及安全检查后的启动日志摘录，私有配置与实际数据不上传。 |
 | 2026-10-26 | feature/device-upload-deployment | 按用户授权将完整运行资料加密包及恢复指引上传GitHub Release，解密口令保存Secrets；远端218673936字节及SHA256与本地一致，原始文件保留，不能每次自动部署都重置数据。 |
 | 2026-10-26 | main | 按用户确认no-ff合并feature/device-upload-deployment，无冲突；更新交付主线为main，同步远端main及默认分支，清理本地已合并分支，远端功能分支暂保留兼容现有Webhook。 |
-| 2026-10-26 | main | 用户要求正式站默认免登录，修复此前只关闭本地、Docker/Compose仍启用登录的问题；统一默认false并透传开关，显式true可启用，设备鉴权保留。 |
+| 2026-10-26 | main | 用户要求正式站默认免登录，修复此前只关闭本地、Docker/Compose仍启用登录的问题；统一默认false并透传开关，显式true可启用，设备鉴权保留；35项后端及浏览器验证通过，功能修复4b21788已推main；推送后线上仍303到/login，待运维切main重建并核对平台环境变量，不能标记线上验收完成。 |
