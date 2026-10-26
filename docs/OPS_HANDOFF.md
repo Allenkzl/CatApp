@@ -5,7 +5,7 @@
 另有2026-10-26完整运行资料的加密GitHub Release备份，含原始照片、漫画、日志和私有配置，恢复步骤见 [运行备份说明](RUNTIME_BACKUP.md)。下述“源码交接包不含数据”是指源码包，不能误认为完整数据未备份。
 
 - 源码仓库：https://github.com/Allenkzl/CatApp 。2026-10-26核实当前为公开仓库，可直接访问；如果之后改回私有，需要仓库所有者为运维GitHub账号授权。
-- 交付分支：`feature/device-upload-deployment`，未合并 `main`；以交接压缩包旁的 `SOURCE_VERSION.txt` 中完整 commit 为准，不部署旧 `main`。
+- 当前交付主分支：`main`，2026-10-26已合并完整功能。新部署按确认后的main完整commit获取；历史交接压缩包仍以其 `SOURCE_VERSION.txt` 为准，不把历史快照版本误认为当前版本。
 - 2026-10-21 用户反馈现有设备直传及漫画流程测试成功。已有本地软件验证记录；正式服务器仍须重新验收。
 - 本包提供 Dockerfile、Compose、配置模板、Nginx 示例、设备脚本及运维说明，**不含已构建镜像、实际照片、模型密钥、设备 token 或管理员密码**。
 - 制作本包的电脑未安装 Docker Engine/CLI，镜像构建、Compose 原生命令验证和容器测试尚未运行。运维需执行下文步骤；源码测试不能替代容器验收。
@@ -28,6 +28,8 @@ reCamera（检测、拍照、断网留存）
 网站建议使用独立域名根路径，如 `https://cats.company.example`；目前不支持直接挂到 `/catapp/` 子路径。公司网站可通过导航链接或独立子域名接入。
 
 ## 上线前需要双方确认
+
+2026-10-26主线切换到main：已有Webhook/自动构建若过滤旧功能分支，需要运维修改分支规则。GitHub默认分支切换不保证外部流水线自动跟随。本轮保留远端旧功能分支，未删除其历史提交或备份Release。
 
 | 项目 | 责任与要求 |
 | --- | --- |
@@ -59,7 +61,7 @@ reCamera（检测、拍照、断网留存）
 可解压交接包，或从GitHub拉取源码（若仓库转为私有，使用已授权账号）：
 
 ```bash
-git clone --branch feature/device-upload-deployment https://github.com/Allenkzl/CatApp.git
+git clone --branch main https://github.com/Allenkzl/CatApp.git
 cd CatApp
 git rev-parse HEAD
 ```

@@ -17,11 +17,12 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`feature/device-upload-deployment`，基于完整漫画版本新增设备直传、服务器登录/配置、Docker部署文件与交付文档；已推送仓库 https://github.com/Allenkzl/CatApp （当前公开），默认分支为本功能分支；保留本地main，未合并。
+- 活跃分支：无。本轮已按用户确认将 `feature/device-upload-deployment` 无冲突合并到 `main`，当前主分支为 `main`；GitHub仓库 https://github.com/Allenkzl/CatApp （当前公开），本轮同步创建远端main并设为默认分支。远端旧功能分支保留供运维切换Webhook，本地已合并分支按规则清理。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：持续真实抓拍、同摄像头同北京日期按 N 张组图、DeepSeek 英文故事、Seedream 英文手绘漫画、原图回看和 PNG 下载；两篇2560×1440真实绘图已生成。旧事件和作品保留，review/studio 导航注释且路由暂停。
 
 ## 重要约定
+- 2026-10-26起源码主线为main；后续推送及运维部署应以main的固定commit为准。已有Webhook若限定feature/device-upload-deployment，需运维调整为main；不能仅凭GitHub默认分支变更推断外部Webhook已改好。历史Release快照及其口令不因合并改变。
 - 2026-10-26用户明确授权完整运行资料上云：本地项目和.data原内容已做加密快照，33张当前站照片/10篇作品及旧站、真实凭据和完整日志均包含；加密包已上传GitHub Release并核对远端SHA256一致，解密口令已放仓库Secrets，明文配置仍忽略。恢复需运维一次导入持久化目录，Webhook源码更新不会自动覆盖数据；见docs/RUNTIME_BACKUP.md。
 - 2026-10-26推送前通过GitHub核实Allenkzl/CatApp已是PUBLIC（最初创建时为私有），本轮不改变仓库可见性；仅推送源码和排障记录，凭据/照片/完整运行日志保持忽略。
 - 2026-10-26测试站再次不可访问：确认4180无监听、旧执行会话不存在，IP和数据索引正常，缺少历史退出日志，不能确认代码崩溃原因。改用Node detached独立进程组运行，已核实PPID=1；私有日志`.data/server.log`、PID记录`.data/server.pid`。未安装开机守护，重启电脑仍需启动服务；处理进程前核对PID实际命令，不能只信PID文件。恢复后33张照片、10篇作品记录、相机心跳在线。
@@ -76,3 +77,4 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-26 | feature/device-upload-deployment | 测试站进程退出后恢复为独立后台进程并启用日志；页面/API及相机心跳验证正常，原始退出原因因无日志暂不能确认。 |
 | 2026-10-26 | feature/device-upload-deployment | 按用户明确要求整理近期修改和排障记录并同步GitHub；新增docs/OPERATIONS_STATUS.md及安全检查后的启动日志摘录，私有配置与实际数据不上传。 |
 | 2026-10-26 | feature/device-upload-deployment | 按用户授权将完整运行资料加密包及恢复指引上传GitHub Release，解密口令保存Secrets；远端218673936字节及SHA256与本地一致，原始文件保留，不能每次自动部署都重置数据。 |
+| 2026-10-26 | main | 按用户确认no-ff合并feature/device-upload-deployment，无冲突；更新交付主线为main，同步远端main及默认分支，清理本地已合并分支，远端功能分支暂保留兼容现有Webhook。 |

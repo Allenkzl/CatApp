@@ -4,7 +4,7 @@
 
 用户于2026-10-26明确授权将本地运行资料上传GitHub，作为运维已有Docker/Webhook部署的迁移来源。
 
-- 源码已同步 `feature/device-upload-deployment`；本次数据快照的源码版本为 `c16967b75c11e22e545966e095a6fe3935cd4a2b`。
+- 当前源码主分支为 `main`，已合并完整功能；本次历史数据快照取自合并前的 `feature/device-upload-deployment`，源码版本仍为 `c16967b75c11e22e545966e095a6fe3935cd4a2b`，备份内容与口令不因合并改变。
 - GitHub Release： https://github.com/Allenkzl/CatApp/releases/tag/runtime-backup-20261026-c16967b
 - 数据资产：`catapp-runtime-20261026-c16967b.tar.gz.enc`，约219MB（33张当前站照片、10篇作品记录，另含旧站数据、全部原始日志和私有配置）。
 - 原始项目文件和运行目录按原内容归档，只排除`.git`、生成缓存与备份自身。API密钥、设备token、相机登录配置和完整日志均在加密包内，不做内容删改。
