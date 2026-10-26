@@ -1,0 +1,13 @@
+# Allow only runtime inputs. Never send credentials, captures or Git history to a builder.
+**
+!Dockerfile
+!package.json
+!index.html
+!src/
+!src/**
+!public/
+!public/**
+!server/
+!server/**
+!scripts/
+!scripts/serve.mjs

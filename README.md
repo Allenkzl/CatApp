@@ -1,135 +1,109 @@
-# 阳台猫观察室
+# 阳台猫观察室 CatApp
 
-Open Datalogger 的本地猫咪照片工作台。当前主流程是：
+reCamera Pro 猫咪观测与全英文漫画工作台。保留原始照片，通过 DeepSeek 编写英文故事和分镜，使用豆包 Seedream 生成暖色手绘漫画并保存到作品库。
 
-**reCamera 采集程序下载照片 → 自动同步观测记录 → 同批次同一天每三张组图 → 每日图文漫画进入作品库。**
+```text
+reCamera 检测猫、抓拍 → HTTP/HTTPS 直接上传网站
+→ 按摄像头和北京时间日期，每 N 张一组（默认3）
+→ DeepSeek 英文故事 → Seedream 漫画 → 作品库与PNG下载
+```
 
-当前采用原始照片加通用创作文案排版，不调用 AI、不分析猫的身份和行为，也不直接连接或控制摄像头。
+## 当前交付状态
 
-## 启动
+- 原本地目录/SSH模式保留；新增服务器模式，无桌面目录和SSH依赖。
+- 服务器模式含网页登录、独立设备凭证、JPEG上传、设备活动状态、幂等确认、后台故事和绘图队列。
+- 原两篇英文漫画已通过真实模型调用验证；新设备已完成真实单张抓拍→HTTP直传验证。新设备三张猫检测→模型生成的完整现场验收需另行测试。
+- 本分支为 `feature/device-upload-deployment`，基于完整漫画功能分支；尚未合并本地 `main`。
+- 已补齐 Dockerfile、Compose、HTTPS反代示例和运维交接说明。当前电脑没有Docker，未构建或发布镜像；正式公网部署与容器验收由运维执行。
+- 用户于2026-10-21反馈现有业务流程测试成功；正式服务器上线后需重新验收。
 
-需要 Node.js 18 或更新版本，无需安装第三方运行依赖。
+## Docker运维交付
+
+从 [运维交接说明](docs/OPS_HANDOFF.md) 开始；简短转发文案见 [给运维的消息](docs/OPS_MESSAGE.md)。Docker使用 `deploy/.env.example`，原生Node仍使用根目录 `.env.example`，两者不能混用。配置持久化挂载后再部署，实际凭据不包含在交付文件中。
+
+## 技术与环境
+
+原生 HTML/CSS/JavaScript ES Modules，Node.js 22 LTS 或更新兼容版本，无第三方运行依赖。设备端使用Python 3.11与websockets 10.4（新设备已核实），仅部署设备采集脚本时需要。网站后台不执行猫检测推理，不要求GPU。
+
+首次获取源码后无需 `npm install`。测试脚本的浏览器验证使用本机已有Chrome与Playwright，详见脚本参数和测试章节。
+
+## 本地模式：保留原工作流
 
 ```bash
 npm run dev
 ```
 
-打开 http://localhost:4173 。默认只监听本机，后端每 2 秒检查照片目录，页面每 3 秒刷新数据。也可以点击“同步抓拍”。
-
-默认采集根目录为当前用户的 `~/Desktop/reCamera猫观察`。更换目录或端口：
+打开 http://localhost:4173 。默认只监听本机；读取 `~/Desktop/reCamera猫观察/cats-*/photos.json`，在 `.data/` 保存照片和作品。已有SSH采集配置可继续使用。更换数据与目录：
 
 ```bash
-CAT_CAPTURE_DIR='/absolute/path/to/captures' PORT=4180 npm run dev
+CAT_DATA_DIR=/absolute/path/data CAT_CAPTURE_DIR=/absolute/path/captures npm run dev
 ```
 
-摄像头采集程序需单独运行。此网站不会启动、停止或重新配置它。
+## 服务器模式：设备直传
 
-## 照片如何进入网站
+1. 将 `.env.example` 复制为私有 `.env`，设置真实配置。
+2. 创建持久化数据目录并赋予运行账户读写权限。
+3. 在Node 22中运行：
 
-沿用 `capture cat.md` 描述的电脑端目录协议：
-
-```text
-reCamera猫观察/
-  cats-20261020-090000-example/
-    photos.json
-    01_cat.jpg
-    02_cat.jpg
-    03_cat.jpg
+```bash
+node --env-file=.env scripts/serve.mjs
 ```
 
-`photos.json` 是数组，每条记录至少包含 `local_path` 和带时区的 `captured_at`；`score` 是可选猫检测分数：
+关键配置：
 
-```json
-[
-  {
-    "local_path": "/absolute/path/to/captures/cats-20261020-090000-example/01_cat.jpg",
-    "captured_at": "2026-10-20T09:01:00+08:00",
-    "score": 0.71
-  }
-]
-```
+| 名称 | 说明 |
+| --- | --- |
+| `CAT_MODE=server` | 启用登录和直传；禁用SSH启动与桌面扫描 |
+| `HOST` / `PORT` | 监听地址及端口，服务器默认0.0.0.0:4173 |
+| `CAT_PUBLIC_URL` | 完整对外Origin，如 `https://cats.example.com`，不含路径 |
+| `CAT_DATA_DIR` | 持久化数据目录，默认源码目录的 `.data/` |
+| `CAT_ADMIN_USER` / `CAT_ADMIN_PASSWORD` | 管理员用户名与至少12字符密码；通过环境注入，不进入镜像/源码 |
+| `DEEPSEEK_API_KEY` | 官方DeepSeek看图故事接口密钥 |
+| `SEEDREAM_API_KEY` / `SEEDREAM_MODEL` | 方舟密钥与已开通模型；建议用户已验证的 `doubao-seedream-5-0-flash-260915` |
+| `CAT_AUTO_GENERATE=false` | 隔离测试时关闭所有付费生成 |
+| `CAT_DEVICE_ID` / `CAT_DEVICE_TOKEN` | 可选预置设备，token至少24字符；也可登录后在设置页生成；已保存的轮换凭证优先于环境预置值 |
 
-- 只读取 `cats-*` 批次目录，跳过 `smoke-*` 接口测试。
-- 清单只提供文件名，网站总是从对应批次目录读取图片，不按清单任意读取其他路径；复制到其他电脑后清单中的绝对目录可不同。
-- 只支持 JPG/JPEG。文件不超过 30 MB，检查 JPEG 首尾标记和尺寸，不等于完整图像解码校验。
-- 文件需下载完成并写入清单。照片缺失、半写入或清单更新中时稍后重试，不把失败照片计入三张。
-- 以批次和文件名去重，已接收照片视为不可变输入；需要重新抓拍时建立新批次或新文件名。
-- 同一采集批次、同一北京时间自然日的未编排照片每三张组成一篇。不同批次或跨天不混图，下一组三张形成另一篇。
-- 不更改源目录或源图片；接收到的照片复制到网站自己的数据目录。
+服务器模式默认先进入 `/login`。本机局域网测试可显式设置 `CAT_REQUIRE_LOGIN=false`，直接访问网站并隐藏退出登录按钮；设备上传仍需独立凭证。此开关默认保持登录保护，Compose正式部署模板不关闭登录。登录后在空间设置生成设备上传配置；凭证只显示一次，同名设备重新生成会使旧凭证失效。模型配置与照片接口要求网页登录，设备Bearer凭证没有管理权限。会话有效期8小时，服务重启后重新登录；登录失败10次/10分钟限流。
 
-## 页面
+公网部署由反向代理提供HTTPS，保留原Host请求头；`CAT_PUBLIC_URL` 必须与浏览器地址一致。网站后台需能联网访问DeepSeek/Seedream；相机只需能访问网站上传地址。仅明确的局域网测试使用HTTP。`GET /healthz` 为无需登录的最小健康检查。
 
-- **工作台**：当天抓拍、等待组图进度、每日漫画与目录同步状态。
-- **观测记录**：查看实际抓拍及原图、拍摄时间和来源批次。选择日期回看。旧模拟记录折叠保留。
-- **猫咪档案**：保留原型角色参考，尚未与实际抓拍自动关联。
-- **习惯与画像**：保留旧版演示统计，未对实际抓拍计算时长、轨迹或画像。
-- **作品库**：三格每日图文漫画、三张源照片、可离线查看的 SVG 下载。旧版模拟作品只读保留。
-- **设置**：查看采集目录与同步规则，修改空间配置，导出元数据。
+## 摄像头接入
 
-“事件复核”“漫画工作室”的导航配置已注释，其页面、业务和样式代码保留，直接访问旧哈希不会进入暂停页面。当前流程无需人工复核或进入编辑工作室。
+见 [设备直传说明](docs/DEVICE_UPLOAD.md)。设备只持有网站上传凭证，不持有模型密钥。上传失败留在设备独立outbox中，成功ACK后清理；服务器重传去重，不重复组图。
 
-## 数据保存与备份
+新相机需要首次部署脚本。日常抓拍和上传由设备自身运行，网站服务器无需通过SSH登录相机。
 
-实际抓拍和每日漫画使用服务端本机存储：
+## 存储与迁移
 
-```text
-.data/
-  captures.json        照片和每日漫画索引
-  media/<id>.jpg       接收到的原图副本
-```
+2026-10-26完整运行资料已另行制作GitHub加密迁移备份，含真实凭据、照片、漫画和原始日志；下载、解密及首次导入步骤见 [完整运行备份](docs/RUNTIME_BACKUP.md)。源码Webhook更新不等于覆盖服务器持久化目录。
 
-`.data/` 已被 Git 忽略，静态服务器拒绝直接访问。备份时保留整个目录。正常重启后恢复照片、分组和作品；重复同步不会重复产生作品。可通过 `CAT_DATA_DIR` 指定另一个数据目录，避免多个实例共享同一目录。
+业务数据位于 `CAT_DATA_DIR`：照片 `media/`、漫画 `comics/`、索引 `captures.json`、付费输出缓存 `jobs/`。备份和迁移业务数据须在停止服务后进行，并验证恢复。运行凭据与照片分开交付，不能上传GitHub。
 
-SVG 由已保存的作品索引与原图生成，下载文件内嵌三张照片，可独立离线打开。后续接入 AI 可替换排版产物生成模块，沿用批次与作品关系。
+- 同一个数据目录只能由一个Node进程使用；当前JSON索引按单实例设计。
+- `devices.json` 存设备token哈希；网页登录会话只在内存，不跨重启。
+- 本地私有配置：`secrets.json`、`seedream-config.json`、`collector-config.json`，权限0600，均忽略。
+- 服务重启不会自动重发未知是否计费的模型请求；中断任务明确失败后手动重试。已返回绘图结果缓存可复用，避免重复付费。
+- 浏览器localStorage/IndexedDB仍保留旧原型档案、模拟事件及人工素材；不同域名或浏览器不会自动共享这些旧数据。实际抓拍、组图与漫画以服务器数据为准。
 
-原型的 localStorage/IndexedDB 未清空。猫档案、浏览器素材和旧模拟作品仍属于各浏览器；localhost、127.0.0.1 与不同端口的浏览器存储彼此独立。新抓拍则由连接的本机网站服务共享。
-
-“恢复浏览器演示数据”不会删除 `.data/` 中的抓拍和每日漫画。JSON 导出包含记录和作品元数据，不包含照片文件；暂不支持 JSON 导入。
-
-## 验证边界
-
-目录同步成功不证明摄像头在线；单张照片不能证明持续时长、真实行为或身份。猫检测分数不等于行为分析置信度。照片排版文案为创作，不构成真实连续事件结论。
-
-本轮用已有三张抓拍验证实际目录读取、页面展示与组图；用隔离临时目录验证新照片逐张自动进入、下一组三张、重复扫描和正常重启。没有启动新一轮摄像头实拍或部署无人值守 AI。
-
-## 检查
+## 验证
 
 ```bash
 npm run check
 npm test
+npm run test:camera
+npm run verify:server
 ```
 
-浏览器流程脚本需要可用的 Playwright 和 Chrome，但它们不是网站运行依赖。脚本会自行启动临时端口和隔离数据目录，不污染真实抓拍与当前浏览器数据：
+最后一项需要已有Playwright及Chrome，可设置 `PLAYWRIGHT_MODULE` 与 `CHROME_PATH`。它启动隔离服务器、测试登录/权限、三张直传、重复ACK、组图和重启恢复，不调用付费模型，不污染真实数据。截图在Git忽略目录 `artifacts/`。
 
-```bash
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
-CHROME_PATH='/absolute/path/to/Chrome' \
-node scripts/verify.mjs
-```
+原英文故事/漫画流程及手工PNG回填见 [漫画说明](docs/COMIC_GENERATION.md)。
 
-验证导航隐藏、1→2→3→6 张自动同步、原图、SVG、旧数据只读保留、正常重启、路径边界及桌面/手机布局。截图和下载产物保存在忽略的 `artifacts/`。
+## 边界
 
-## 目录结构
+单张抓拍不能确认猫的身份、持续时长或连续事件。故事和对白为虚构，自动漫画默认标记尚未人工审核。画像和习惯页的旧数据仍是演示内容。当前未配置系统开机服务；相机与后台重启后的进程管理交给后续部署阶段。
 
-```text
-src/app.js                  页面与原型业务
-src/capture.js              抓拍同步与每日漫画界面
-src/data.js                  导航及旧模拟数据
-src/art.js                  旧版 SVG 插画与图标
-src/style.css               响应式样式
-server/capture-store.mjs     目录同步、持久化、三张分组与照片排版
-scripts/serve.mjs           本地网页、数据和媒体接口
-scripts/verify.mjs          隔离浏览器流程验证
-tests/capture-store.test.mjs 后端测试
-public/                     旧版角色参考与图标
-docs/superpowers/specs/      已确认设计
-docs/sessions/              用户要求存档时记录
-```
+## 界面与素材
 
-旧版角色参考照片来自 Unsplash `photo-1573865526739-10659fec78a5` 和 `photo-1518791841217-8f162f1e1131`，仅作原型素材，不对应实际采集个体。
+右上角可切换中文/English并记住语言。`src/messages.js` 与 `src/i18n.js` 只翻译固定界面文案，保留用户输入、文件名、批次和目录原文。漫画图片固定全英文，旧SVG语言按请求生成。
 
-## 界面语言
-
-右上角选择「中文 / English」，立即切换全站文案并记住选择。每日漫画的预览与 SVG 下载使用当前语言；用户填写的内容、采集文件名、批次与路径保留原文。无需联网翻译或新增运行依赖。
-
-维护文案请更新 `src/messages.js`；HTML 使用 `src/i18n.js` 的 `html` 标签，仅翻译模板静态文案，不翻译插值中的用户数据。双语浏览器验证脚本为 `scripts/verify-i18n.mjs`，沿用 `scripts/verify.mjs` 的 Playwright/Chrome 环境变量，并使用临时数据目录。
+旧版角色参考照片来自 Unsplash `photo-1573865526739-10659fec78a5` 和 `photo-1518791841217-8f162f1e1131`，仅作原型素材，不对应实际采集个体。画风参考为项目生成插画。

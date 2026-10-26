@@ -1,8 +1,9 @@
 import {readdir, readFile, writeFile, mkdir, rename, realpath, stat} from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {esc} from '../src/art.js';
 import {htmlFor, translate, workTitle} from '../src/i18n.js';
+import {esc} from '../src/art.js';
+import {validatePublication} from './comic-publication.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex').slice(0,24);
 const inside=(root,file)=>{const rel=path.relative(root,file);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
@@ -35,17 +36,24 @@ function localDate(iso){
  return {date:parts.slice(0,10),time:parts.slice(11,19),capturedAt:time.toISOString()};
 }
 export class CaptureStore {
- constructor({inputRoot,dataDir}){this.inputRoot=path.resolve(inputRoot);this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[]};this.errors=[];this.status='waiting';this.running=null;}
+ constructor({inputRoot,dataDir}){this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
  async init(){
   await mkdir(path.join(this.dataDir,'media'),{recursive:true});
+  await mkdir(path.join(this.dataDir,'comics'),{recursive:true});
   try{const saved=JSON.parse(await readFile(path.join(this.dataDir,'captures.json'),'utf8'));if(saved.version!==1||!Array.isArray(saved.photos)||!Array.isArray(saved.works))throw new Error('Invalid capture store');this.index=saved;}
   catch(error){if(error.code!=='ENOENT')throw new Error('抓拍数据索引损坏，已停止同步以保留原文件。');}
+  this.index.settings ||= {batchPhotoCount:3};this.index.groups ||= [];
+  let migrated=false;
+  for(const work of this.index.works)if(work.mode==='photo-layout'){work.previewUrl=work.comicUrl;work.comicUrl=null;work.mode='illustrated-comic';work.status='ready_for_generation';migrated=true;}
+  if(migrated)await this.save();
   await this.sync();return this;
  }
  async save(){const file=path.join(this.dataDir,'captures.json');await writeFile(file+'.tmp',JSON.stringify(this.index,null,2));await rename(file+'.tmp',file);}
- sync(){if(this.running)return this.running;this.running=this.scan().finally(()=>{this.running=null;});return this.running;}
+ enqueue(action){const pending=this.queue.then(action);this.queue=pending.catch(()=>{});return pending;}
+ sync(){if(this.running)return this.running;this.running=this.enqueue(()=>this.scan()).finally(()=>{this.running=null;});return this.running;}
  async scan(){
   this.errors=[];let changed=false;
+  if(!this.inputRoot){this.status='direct';if(this.groupUnassigned()||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}return this.snapshot();}
   let dirs,root;
   try{root=await realpath(this.inputRoot);dirs=await readdir(root,{withFileTypes:true});this.status='watching';}
   catch(error){this.status='waiting';this.errors.push(error.code==='ENOENT'?'等待采集目录出现。':'暂时无法读取采集目录。');return this.snapshot();}
@@ -71,29 +79,99 @@ export class CaptureStore {
       const fileStat=await stat(file);if(!fileStat.isFile()||fileStat.size>30*1024*1024)throw new Error('照片文件大小不支持');
       const buffer=await readFile(file),dimensions=jpegSize(buffer),when=localDate(record.captured_at);
       const target=path.join(this.dataDir,'media',photoId+'.jpg');await writeFile(target+'.part',buffer);await rename(target+'.part',target);
-      this.index.photos.push({id:photoId,session:entry.name,name,...when,...dimensions,score:Number.isFinite(record.score)&&record.score>=0&&record.score<=1?record.score:null,url:`/api/capture/photos/${photoId}.jpg`,source:'reCamera',identity:'unknown'});changed=true;
+      this.index.photos.push({id:photoId,session:entry.name,name,cameraId:typeof record.camera_id==='string'?record.camera_id.slice(0,100):'recamera-default',...when,...dimensions,score:Number.isFinite(record.score)&&record.score>=0&&record.score<=1?record.score:null,url:`/api/capture/photos/${photoId}.jpg`,source:'reCamera',identity:'unknown'});changed=true;
      }catch(error){this.errors.push(`${entry.name}：${error.code==='ENOENT'?'照片尚未就绪':error.message}`);}
     }
    }catch(error){if(error.code!=='ENOENT')this.errors.push(`${entry.name}：${error instanceof SyntaxError?'清单正在更新，稍后重试':error.message}`);}
   }
-  const assigned=new Set(this.index.works.flatMap(w=>w.photoIds));
-  const groups=new Map();
-  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id)).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt))){const key=photo.session+'/'+photo.date;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(photo);}
-  for(const photos of groups.values())while(photos.length>=3){
-   const batch=photos.splice(0,3),id=hash(batch.map(p=>p.id).join('/')),date=batch[0].date;
-   const ordinal=this.index.works.filter(w=>w.date===date).length+1;
-   this.index.works.push({id,date,title:`每日漫画 · ${date.replaceAll('-','.')} ${ordinal>1?`/ 第 ${ordinal} 篇`:''}`.trim(),photoIds:batch.map(p=>p.id),session:batch[0].session,createdAt:new Date().toISOString(),mode:'photo-layout',status:'completed',comicUrl:`/api/capture/works/${id}.svg`});changed=true;
-  }
+  changed=this.groupUnassigned()||changed;
   // Also retry an interrupted index write even if the next scan finds no new files.
   if(changed||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}
   return this.snapshot();
  }
+ groupUnassigned(){
+  let changed=false;
+  const assigned=new Set(this.index.works.flatMap(w=>w.photoIds));
+  const groups=new Map();
+  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id)).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt))){
+   const key=(photo.cameraId||'recamera-default')+'/'+photo.date;
+   if(!groups.has(key))groups.set(key,[]);groups.get(key).push(photo);
+  }
+  for(const [key,photos] of groups){
+   let group=this.index.groups.find(g=>g.key===key);
+   if(!group){group={key,target:this.index.settings.batchPhotoCount};this.index.groups.push(group);changed=true;}
+   while(photos.length>=group.target){
+    const batch=photos.splice(0,group.target),id=hash(batch.map(p=>p.id).join('/')),date=batch[0].date;
+    this.index.works.push({id,date,title:`Daily Cat Diary · ${date} / ${this.index.works.filter(w=>w.date===date).length+1}`,photoIds:batch.map(p=>p.id),cameraId:batch[0].cameraId||'recamera-default',session:batch[0].session,createdAt:new Date().toISOString(),mode:'illustrated-comic',status:'ready_for_generation',comicUrl:null});
+    group.target=this.index.settings.batchPhotoCount;changed=true;
+   }
+   if(!photos.length)this.index.groups=this.index.groups.filter(g=>g.key!==key);
+  }
+  return changed;
+ }
  snapshot(){
   const assigned=new Set(this.index.works.flatMap(w=>w.photoIds)),pending=[];
-  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id))){let group=pending.find(g=>g.session===photo.session&&g.date===photo.date);if(!group){group={session:photo.session,date:photo.date,count:0};pending.push(group);}group.count++;}
+  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id))){
+   const key=(photo.cameraId||'recamera-default')+'/'+photo.date;
+   let group=pending.find(g=>g.key===key);
+   if(!group){group={key,session:photo.session,date:photo.date,count:0,target:this.index.groups.find(g=>g.key===key)?.target||this.index.settings.batchPhotoCount};pending.push(group);}group.count++;
+  }
   return {...this.index,pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
  }
+ ingestUpload(deviceId,metadata,buffer){return this.enqueue(async()=>{
+  const bad=message=>{const e=new Error(message);e.statusCode=400;throw e;};
+  if(typeof metadata.photoId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(metadata.photoId))bad('Invalid photo ID');
+  if(!Buffer.isBuffer(buffer)||buffer.length>30*1024*1024)bad('JPEG must be at most 30 MB');
+  let dimensions,when;try{dimensions=jpegSize(buffer);when=localDate(metadata.capturedAt);}catch(e){bad(e.message);}
+  const id=hash('upload/'+deviceId+'/'+metadata.photoId),contentHash=createHash('sha256').update(buffer).digest('hex');
+  const existing=this.index.photos.find(p=>p.id===id);
+  if(existing){if(existing.contentHash!==contentHash||existing.capturedAt!==when.capturedAt){const e=new Error('Photo ID already exists with different content or capture time');e.statusCode=409;throw e;}if(this.unsaved){await this.save();this.unsaved=false;}return {photoId:id,duplicate:true};}
+  const file=path.join(this.dataDir,'media',id+'.jpg');await writeFile(file+'.part',buffer);await rename(file+'.part',file);
+  const previous=this.index;this.index=structuredClone(previous);
+  this.index.photos.push({id,cameraId:deviceId,externalId:metadata.photoId,name:metadata.photoId+'.jpg',session:'device-'+deviceId,...when,...dimensions,contentHash,score:null,url:`/api/capture/photos/${id}.jpg`,source:'reCamera direct upload',identity:'unknown'});
+  this.groupUnassigned();
+  try{await this.save();}catch(e){this.index=previous;throw e;}
+  return {photoId:id,duplicate:false};
+ });}
+ updateSettings(input){return this.enqueue(async()=>{
+  if(!Number.isInteger(input?.batchPhotoCount)||input.batchPhotoCount<1||input.batchPhotoCount>12){const e=new Error('Photo count must be an integer from 1 to 12');e.statusCode=400;throw e;}
+  const previous=this.index.settings;this.index.settings={batchPhotoCount:input.batchPhotoCount};
+  try{await this.save();}catch(e){this.index.settings=previous;throw e;}return this.snapshot();
+ });}
+ updateJob(id,patch){return this.enqueue(async()=>{
+  const old=this.index,work=old.works.find(w=>w.id===id);if(!work)throw new Error('Unknown work');
+  this.index={...old,works:old.works.map(w=>w.id===id?{...w,...patch}:w)};
+  try{await this.save();}catch(e){this.index=old;throw e;}return this.snapshot();
+ });}
  async photoFile(id){if(!/^[a-f0-9]{24}$/.test(id)||!this.index.photos.some(p=>p.id===id))return null;return path.join(this.dataDir,'media',id+'.jpg');}
+ async artworkFile(id,digest){
+  const work=this.index.works.find(w=>w.id===id);
+  const art=[work?.artwork,...(work?.history||[])].find(a=>a?.digest===digest);
+  return art?path.join(this.dataDir,'comics',id+'-'+digest+'.png'):null;
+ }
+ setGeneration(id,input){return this.enqueue(async()=>{
+  const work=this.index.works.find(w=>w.id===id);
+  if(!work){const error=new Error('Unknown capture batch');error.statusCode=404;throw error;}
+  if(!['ready_for_generation','awaiting_image_provider','generating','failed'].includes(input?.status)){const error=new Error('Invalid generation state');error.statusCode=400;throw error;}
+  if(input.status==='awaiting_image_provider'&&!work.story){const error=new Error('A storyboard is required before drawing');error.statusCode=400;throw error;}
+  const next={...work,status:input.status};
+  if(input.status==='failed')next.error=String(input.error||'Generation failed. Retry using the same photos.').slice(0,500);else delete next.error;
+  const previous=this.index;this.index={...previous,works:previous.works.map(w=>w.id===id?next:w)};
+  try{await this.save();}catch(error){this.index=previous;throw error;}
+  return this.snapshot();
+ });}
+ publish(id,input){return this.enqueue(async()=>{
+  const work=this.index.works.find(w=>w.id===id);
+  const result=validatePublication(work,input);
+  const file=id+'-'+result.digest+'.png',target=path.join(this.dataDir,'comics',file);
+  await writeFile(target+'.part',result.buffer);await rename(target+'.part',target);
+  const same=work.artwork?.digest===result.digest&&JSON.stringify(work.artwork.metadata)===JSON.stringify(result.metadata);
+  const art=same?work.artwork:{digest:result.digest,width:result.width,height:result.height,url:`/api/capture/works/${id}/artwork/${result.digest}.png`,publishedAt:new Date().toISOString(),metadata:result.metadata};
+  const next={...work,title:result.metadata.title,status:'completed',mode:'illustrated-comic',artwork:art,comicUrl:art.url,history:same?(work.history||[]):[...(work.history||[]),...(work.artwork?[work.artwork]:[])]};delete next.error;
+  const previous=this.index;this.index={...previous,works:previous.works.map(w=>w.id===id?next:w)};
+  try{await this.save();}catch(error){this.index=previous;throw error;}
+  return this.snapshot();
+ });}
  async comic(id, language='zh'){
   const html=htmlFor(language), t=value=>translate(value,language);
   const work=this.index.works.find(w=>w.id===id);if(!work)return null;

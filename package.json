@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "start": "node scripts/serve.mjs",
-    "check": "node --check src/app.js && node --check src/art.js && node --check src/data.js && node --check src/capture.js && node --check server/capture-store.mjs && node --check scripts/serve.mjs && node --check src/i18n.js && node --check src/messages.js && node --check scripts/verify-i18n.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "check": "node --check src/app.js && node --check src/art.js && node --check src/data.js && node --check src/capture.js && node --check server/capture-store.mjs && node --check scripts/serve.mjs && node --check src/i18n.js && node --check src/messages.js && node --check scripts/verify-i18n.mjs && node --check server/auto-comic.mjs && node --check server/collector.mjs && node --check server/comic-publication.mjs && node --check server/seedream.mjs && node --check server/access.mjs && node --check server/runtime-config.mjs && node --check server/login-page.mjs && node --check scripts/verify-container.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:camera": "python3 -m unittest discover -s tests/recamera",
+    "verify:server": "node scripts/verify-server.mjs",
+    "verify:container": "node scripts/verify-container.mjs"
   }
 }

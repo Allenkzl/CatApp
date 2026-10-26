@@ -1,0 +1,41 @@
+name: catapp
+services:
+  app:
+    image: "${CAT_IMAGE:-catapp:deploy-candidate}"
+    build:
+      context: .
+    restart: unless-stopped
+    init: true
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    ports:
+      - "${CAT_BIND_IP:-127.0.0.1}:${CAT_HOST_PORT:-4173}:4173"
+    environment:
+      NODE_ENV: production
+      CAT_MODE: server
+      HOST: 0.0.0.0
+      PORT: "4173"
+      CAT_DATA_DIR: /app/data
+      CAT_PUBLIC_URL: "${CAT_PUBLIC_URL:?Set the public HTTPS origin}"
+      CAT_ADMIN_USER: "${CAT_ADMIN_USER:-admin}"
+      CAT_ADMIN_PASSWORD: "${CAT_ADMIN_PASSWORD:?Set a unique admin password}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      SEEDREAM_API_KEY: "${SEEDREAM_API_KEY:-}"
+      SEEDREAM_MODEL: "${SEEDREAM_MODEL:-doubao-seedream-5-0-flash-260915}"
+      CAT_AUTO_GENERATE: "${CAT_AUTO_GENERATE:-false}"
+    volumes:
+      - type: bind
+        source: "${CAT_HOST_DATA_DIR:?Set an absolute persistent host directory}"
+        target: /app/data
+        bind:
+          create_host_path: false
+    stop_grace_period: 210s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
