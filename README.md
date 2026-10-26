@@ -75,6 +75,8 @@ node --env-file=.env scripts/serve.mjs
 
 ## 存储与迁移
 
+2026-10-26完整运行资料已另行制作GitHub加密迁移备份，含真实凭据、照片、漫画和原始日志；下载、解密及首次导入步骤见 [完整运行备份](docs/RUNTIME_BACKUP.md)。源码Webhook更新不等于覆盖服务器持久化目录。
+
 业务数据位于 `CAT_DATA_DIR`：照片 `media/`、漫画 `comics/`、索引 `captures.json`、付费输出缓存 `jobs/`。备份和迁移业务数据须在停止服务后进行，并验证恢复。运行凭据与照片分开交付，不能上传GitHub。
 
 - 同一个数据目录只能由一个Node进程使用；当前JSON索引按单实例设计。

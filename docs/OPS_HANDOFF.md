@@ -2,6 +2,8 @@
 
 ## 交付状态与入口
 
+另有2026-10-26完整运行资料的加密GitHub Release备份，含原始照片、漫画、日志和私有配置，恢复步骤见 [运行备份说明](RUNTIME_BACKUP.md)。下述“源码交接包不含数据”是指源码包，不能误认为完整数据未备份。
+
 - 源码仓库：https://github.com/Allenkzl/CatApp 。2026-10-26核实当前为公开仓库，可直接访问；如果之后改回私有，需要仓库所有者为运维GitHub账号授权。
 - 交付分支：`feature/device-upload-deployment`，未合并 `main`；以交接压缩包旁的 `SOURCE_VERSION.txt` 中完整 commit 为准，不部署旧 `main`。
 - 2026-10-21 用户反馈现有设备直传及漫画流程测试成功。已有本地软件验证记录；正式服务器仍须重新验收。
