@@ -2,7 +2,7 @@
 
 ## 交付状态与入口
 
-- 源码私有仓库：https://github.com/Allenkzl/CatApp 。需要仓库所有者为运维 GitHub 账号授权。
+- 源码仓库：https://github.com/Allenkzl/CatApp 。2026-10-26核实当前为公开仓库，可直接访问；如果之后改回私有，需要仓库所有者为运维GitHub账号授权。
 - 交付分支：`feature/device-upload-deployment`，未合并 `main`；以交接压缩包旁的 `SOURCE_VERSION.txt` 中完整 commit 为准，不部署旧 `main`。
 - 2026-10-21 用户反馈现有设备直传及漫画流程测试成功。已有本地软件验证记录；正式服务器仍须重新验收。
 - 本包提供 Dockerfile、Compose、配置模板、Nginx 示例、设备脚本及运维说明，**不含已构建镜像、实际照片、模型密钥、设备 token 或管理员密码**。
@@ -54,7 +54,7 @@ reCamera（检测、拍照、断网留存）
 
 ## 1. 获取固定源码版本
 
-可解压交接包，或通过具有私有仓库权限的账号拉取源码：
+可解压交接包，或从GitHub拉取源码（若仓库转为私有，使用已授权账号）：
 
 ```bash
 git clone --branch feature/device-upload-deployment https://github.com/Allenkzl/CatApp.git
