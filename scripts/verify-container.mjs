@@ -24,7 +24,7 @@ async function start(){
 async function login(){const r=await fetch(base+'/login',{method:'POST',headers:host,body:new URLSearchParams({username:'admin',password}),redirect:'manual'});assert.equal(r.status,303);return {...host,Cookie:r.headers.get('set-cookie').split(';')[0]};}
 async function snapshot(auth){return (await fetch(base+'/api/capture',{headers:auth})).json();}
 try{
- await writeFile(path.join(temp,'env'),`CAT_MODE=server\nCAT_PUBLIC_URL=http://catapp-smoke.invalid\nCAT_ADMIN_PASSWORD=${password}\nCAT_AUTO_GENERATE=false\nDEEPSEEK_API_KEY=\nSEEDREAM_API_KEY=\n`,{mode:0o600});
+ await writeFile(path.join(temp,'env'),`CAT_MODE=server\nCAT_REQUIRE_LOGIN=true\nCAT_PUBLIC_URL=http://catapp-smoke.invalid\nCAT_ADMIN_PASSWORD=${password}\nCAT_AUTO_GENERATE=false\nDEEPSEEK_API_KEY=\nSEEDREAM_API_KEY=\n`,{mode:0o600});
  docker('volume','create',volume);volumeCreated=true;await start();
  assert.equal(docker('exec',name,'id','-u'),'1000');
  assert.equal((await fetch(base+'/api/capture',{headers:host})).status,401);
@@ -40,7 +40,12 @@ try{
  docker('stop','-t','10',name);docker('rm',name);created=false;
  await start();const restoredAuth=await login();s=await snapshot(restoredAuth);assert.equal(s.photos.length,3);assert.equal(s.works.length,1);
  assert.equal((await upload(0)).status,200);assert.equal((await snapshot(restoredAuth)).photos.length,3);
- console.log('PASS: non-root/read-only container, login, device registration, 3 uploads, grouping, duplicate ACK, private media, container replacement with persistent data and device credentials. No paid API calls.');
+ docker('stop','-t','10',name);docker('rm',name);created=false;
+ await writeFile(path.join(temp,'env'),'CAT_MODE=server\nCAT_PUBLIC_URL=http://catapp-smoke.invalid\nCAT_AUTO_GENERATE=false\nDEEPSEEK_API_KEY=\nSEEDREAM_API_KEY=\n',{mode:0o600});await start();
+ const open=await fetch(base+'/api/capture',{headers:host});assert.equal(open.status,200);const state=await open.json();assert.equal(state.requireLogin,false);assert.equal(state.photos.length,3);
+ const noLogin=await fetch(base+'/login',{headers:host,redirect:'manual'});assert.equal(noLogin.status,303);assert.equal(noLogin.headers.get('location'),'/');assert.equal((await fetch(base+'/',{headers:host})).status,200);
+ assert.equal((await fetch(base+'/api/device/photos',{method:'POST',headers:host})).status,401);
+ console.log('PASS: non-root/read-only container, default direct access and explicit login, device registration, 3 uploads, grouping, duplicate ACK, private media, container replacement with persistent data and device credentials. No paid API calls.');
 }catch(error){console.error('FAIL:',error.message);process.exitCode=1;}
 finally{
  try{if(created)docker('rm','-f',name);}catch{console.error('Cleanup needed: '+name);}

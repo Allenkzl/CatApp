@@ -2,6 +2,8 @@
 
 ## 交付状态与入口
 
+2026-10-26登录默认值已按用户要求改为关闭：Node、Docker和Compose均默认免登录。现有运维环境若明确配置CAT_REQUIRE_LOGIN=true，需要修改为false并重建容器；若平台仍拉旧功能分支或旧镜像，必须改为main最新提交。
+
 另有2026-10-26完整运行资料的加密GitHub Release备份，含原始照片、漫画、日志和私有配置，恢复步骤见 [运行备份说明](RUNTIME_BACKUP.md)。下述“源码交接包不含数据”是指源码包，不能误认为完整数据未备份。
 
 - 源码仓库：https://github.com/Allenkzl/CatApp 。2026-10-26核实当前为公开仓库，可直接访问；如果之后改回私有，需要仓库所有者为运维GitHub账号授权。
@@ -114,7 +116,8 @@ sudo install -d -o 1000 -g 1000 -m 0700 /srv/catapp/data
 | CAT_HOST_DATA_DIR | 服务器绝对路径，例 /srv/catapp/data；目录必须事先存在，UID/GID 1000可读写 |
 | CAT_PUBLIC_URL | 正式HTTPS Origin，必须与浏览器域名/端口一致，不带路径 |
 | CAT_BIND_IP / CAT_HOST_PORT | 同主机Nginx默认127.0.0.1 / 4173；容器内固定4173 |
-| CAT_ADMIN_USER / CAT_ADMIN_PASSWORD | 管理员用户名及独立强密码，至少12字符，不能保留REPLACE占位值 |
+| CAT_REQUIRE_LOGIN | 默认false，直接进入页面；现有平台若保存true，须改false并重建容器 |
+| CAT_ADMIN_USER / CAT_ADMIN_PASSWORD | 仅CAT_REQUIRE_LOGIN=true时必须设置独立强密码，至少12字符，不能保留REPLACE占位值 |
 | DEEPSEEK_API_KEY | 官方DeepSeek密钥，或登录后在设置页配置 |
 | SEEDREAM_API_KEY / SEEDREAM_MODEL | 方舟密钥及已开通模型；当前实测模型ID见模板，运营账户需自行开通 |
 | CAT_AUTO_GENERATE | 先false验证基础设施；正式业务前显式改true并重建容器 |
@@ -129,7 +132,7 @@ docker compose --env-file deploy/.env ps
 curl --fail http://127.0.0.1:4173/healthz
 ```
 
-`CAT_HOST_DATA_DIR` 是宿主机目录，`CAT_DATA_DIR=/app/data` 已固定在容器环境中；不要将后者误填成宿主机路径。启动失败先检查目录存在、权限、密码和URL，不以root运行来绕过权限问题。SELinux主机由运维为专用目录设置合适标签，不关闭全局SELinux。
+`CAT_HOST_DATA_DIR` 是宿主机目录，`CAT_DATA_DIR=/app/data` 已固定在容器环境中；不要将后者误填成宿主机路径。启动失败先检查目录存在、权限和URL；启用登录时还需检查密码，不以root运行来绕过权限问题。SELinux主机由运维为专用目录设置合适标签，不关闭全局SELinux。
 
 ## 4. HTTPS反向代理
 
@@ -141,7 +144,7 @@ curl --fail http://127.0.0.1:4173/healthz
 
 ## 5. 业务开启与相机切换
 
-1. 通过HTTPS域名登录，检查空间设置、生成数量及设备列表。
+1. 打开HTTPS域名，应直接进入页面，检查空间设置、生成数量及设备列表。仅显式开启登录的部署需要先登录。
 2. 保持 `CAT_AUTO_GENERATE=false` 时不要把隔离测试照片灌入正式库；隔离验证用上面的容器脚本。
 3. 填好模型凭据并确认账户权限与额度；将 `CAT_AUTO_GENERATE=true`，重新执行 `up -d --no-build --pull never`。
 4. 确认新站是空库还是完整迁移库。如果迁移设备凭证哈希且保留原设备token，可以沿用；否则在新站设置页注册/生成设备配置。

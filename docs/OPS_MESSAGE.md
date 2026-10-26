@@ -4,7 +4,7 @@
 
 - 源码：https://github.com/Allenkzl/CatApp （2026-10-26核实为公开仓库；如后续改为私有，需由仓库所有者授权）。当前部署主分支为 main，按确认后的固定commit部署；历史交接包源码版本见其 SOURCE_VERSION.txt。已有Webhook若过滤旧功能分支，请改为main。
 - 交付包含Dockerfile、Compose、配置模板、Nginx示例、设备脚本和完整部署说明 docs/OPS_HANDOFF.md。包内不含已构建镜像，需在目标架构构建并运行隔离容器验证；本机没有Docker，尚未完成容器实测。
-- 单实例部署即可，不需要数据库服务或GPU；程序使用文件目录及JSON索引。
+- 单实例部署即可，不需要数据库服务或GPU；程序使用文件目录及JSON索引。当前默认免登录，若部署平台留有CAT_REQUIRE_LOGIN=true，请改false并重建容器。
 - 需要一个HTTPS域名、服务器持久化目录（例 /srv/catapp/data → 容器 /app/data，UID/GID 1000:1000）、独立备份及外网API访问能力。
 - 管理员密码、DeepSeek与方舟密钥通过安全渠道单独提供，不包含在交接包中。网站默认先关闭付费生成，基础检查通过后按说明显式开启。
 - 请先确认主机架构、正式域名、数据与备份位置、镜像交付方式，以及是否迁移现有照片漫画。建议初次使用独立空库。

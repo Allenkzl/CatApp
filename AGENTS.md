@@ -28,7 +28,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - 2026-10-26测试站再次不可访问：确认4180无监听、旧执行会话不存在，IP和数据索引正常，缺少历史退出日志，不能确认代码崩溃原因。改用Node detached独立进程组运行，已核实PPID=1；私有日志`.data/server.log`、PID记录`.data/server.pid`。未安装开机守护，重启电脑仍需启动服务；处理进程前核对PID实际命令，不能只信PID文件。恢复后33张照片、10篇作品记录、相机心跳在线。
 - 2026-10-26换网排障：当前测试站 http://192.168.6.245:4180，相机192.168.4.186；设备config.json原上传地址仍为192.168.50.109且采集上传进程已停止。已备份配置、改为新站并启动现有上传器，设备凭证和心跳验证通过；用户重新展示cat识别画面后，3张真实新照片已入库（总数7→10），2026-10-26新组已形成并生成英文故事。识别服务运行不等于抓拍上传器运行，当前仍未安装开机守护。
 - 自动同步每3秒继续获取完整状态，但渲染HTML未变化时保持现有DOM，避免心跳时间戳导致整页替换/图片重载；页面标题不再播放入场动画。测试覆盖连续心跳DOM稳定及作品状态自动更新。
-- 用户要求当前局域网测试站免登录：`.data/server-local-env.json` 设置 `CAT_REQUIRE_LOGIN=false`，服务器模式仍使用设备上传凭证。默认服务器与Docker部署仍需管理员登录；API快照requireLogin控制退出按钮。
+- 用户已明确要求线上和本地均默认免登录：Node默认关闭，Docker ENV与Compose透传CAT_REQUIRE_LOGIN默认false，模板一致；显式true才启用登录且校验管理员密码。设备上传凭证独立保留。部署平台若保存true需改false并重建容器；仅推源码不能覆盖平台环境变量。API快照requireLogin控制退出按钮。
 - 全站语言通过右上角切换，默认中文，独立存储键 `catapp-language` 记住选择；`src/messages.js` 为本地词典，`src/i18n.js` 的 `html` 标签只翻译模板静态部分。用户输入、原始照片文件名、批次和目录保留原文；已知默认演示字段仅在展示时翻译，保存未改字段时保留原始值。
 - 每日漫画 SVG 接口支持 `?lang=en` / `?lang=zh`（默认中文），按请求生成，不修改作品索引和原图；修改该接口后需重启本地 Node 服务。
 - 本轮已授权本机 Node 监督独立 SSH 采集器，并调用 DeepSeek 官方看图接口编写故事；不操作 GPIO、不修改原 reCamera 项目，不向外部平台发布。用户已授权 Ark / Seedream 付费绘图，自动图片明确未人工审核；不能把接口失败或等待状态标成漫画已完成。
@@ -50,7 +50,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 
 - `server/seedream.mjs` 为固定官方 Ark 接口适配；代码缺省模型 `doubao-seedream-5-0-pro-260628`；本机实际配置为用户已开通的 `doubao-seedream-5-0-flash-260915`，两篇已成功。设置页支持模型 ID 或 ep 接入点；ModelNotOpen 需账户开通。绘图无自动重试，超时/重启需人工确认后重试；已返回PNG先缓存，发布失败不重付费。自动发布元数据准确记录 seedream-api、模型和未人工审核状态。
 
-- `CAT_MODE=server` 必须配置 `CAT_PUBLIC_URL` 与至少12字符管理员密码；监听0.0.0.0，服务器模式不读取SSH配置、不扫描桌面目录。公开部署需HTTPS反代保持Host及持久化CAT_DATA_DIR，单进程使用数据目录。
+- `CAT_MODE=server` 必须配置 `CAT_PUBLIC_URL`；仅CAT_REQUIRE_LOGIN=true时还需至少12字符管理员密码；监听0.0.0.0，服务器模式不读取SSH配置、不扫描桌面目录。公开部署需HTTPS反代保持Host及持久化CAT_DATA_DIR，单进程使用数据目录。
 - `server/access.mjs` 管理8小时HttpOnly会话、登录限次、独立设备Bearer凭证；`devices.json` 仅存设备凭证哈希。设备凭证不能管理网站。上传图片走POST /api/device/photos，原始JPEG及固定photoId/带时区时间；重复同内容ACK、冲突409。
 - `scripts/recamera/upload_to_website.py` 直接在设备检测/拍照/上传，独立outbox、网络补传、最多100张待传；共享旧采集锁，不修改模型/GPIO。首次部署可用SSH，日常传输为HTTP/HTTPS。凭证不随重定向发送。
 - 2026-10-21现场：新设备192.168.50.94已验证root/Python3.11.6/websockets10.4，完成单张真实抓拍→局域网后台直传；用户随后反馈完整流程测试成功；正式服务器仍须重新验收。独立直传测试站 http://192.168.50.109:4180，数据 `.data/device-live`；旧4173与原两篇漫画保留。测试登录信息仅在忽略的 `.data/server-login.txt`。
@@ -78,3 +78,4 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-26 | feature/device-upload-deployment | 按用户明确要求整理近期修改和排障记录并同步GitHub；新增docs/OPERATIONS_STATUS.md及安全检查后的启动日志摘录，私有配置与实际数据不上传。 |
 | 2026-10-26 | feature/device-upload-deployment | 按用户授权将完整运行资料加密包及恢复指引上传GitHub Release，解密口令保存Secrets；远端218673936字节及SHA256与本地一致，原始文件保留，不能每次自动部署都重置数据。 |
 | 2026-10-26 | main | 按用户确认no-ff合并feature/device-upload-deployment，无冲突；更新交付主线为main，同步远端main及默认分支，清理本地已合并分支，远端功能分支暂保留兼容现有Webhook。 |
+| 2026-10-26 | main | 用户要求正式站默认免登录，修复此前只关闭本地、Docker/Compose仍启用登录的问题；统一默认false并透传开关，显式true可启用，设备鉴权保留。 |

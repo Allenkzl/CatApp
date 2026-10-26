@@ -1,7 +1,7 @@
 FROM node:22-bookworm-slim
 
 WORKDIR /app
-ENV NODE_ENV=production CAT_MODE=server HOST=0.0.0.0 PORT=4173 CAT_DATA_DIR=/app/data
+ENV NODE_ENV=production CAT_MODE=server CAT_REQUIRE_LOGIN=false HOST=0.0.0.0 PORT=4173 CAT_DATA_DIR=/app/data
 COPY --chown=node:node package.json index.html ./
 COPY --chown=node:node src/ ./src/
 COPY --chown=node:node public/ ./public/

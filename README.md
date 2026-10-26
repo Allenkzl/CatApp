@@ -57,13 +57,16 @@ node --env-file=.env scripts/serve.mjs
 | `HOST` / `PORT` | 监听地址及端口，服务器默认0.0.0.0:4173 |
 | `CAT_PUBLIC_URL` | 完整对外Origin，如 `https://cats.example.com`，不含路径 |
 | `CAT_DATA_DIR` | 持久化数据目录，默认源码目录的 `.data/` |
-| `CAT_ADMIN_USER` / `CAT_ADMIN_PASSWORD` | 管理员用户名与至少12字符密码；通过环境注入，不进入镜像/源码 |
+| `CAT_REQUIRE_LOGIN` | 默认false，直接进入网站；仅显式设置true时启用登录 |
+| `CAT_ADMIN_USER` / `CAT_ADMIN_PASSWORD` | 仅启用登录时需要管理员用户名与至少12字符密码；通过环境注入，不进入镜像/源码 |
 | `DEEPSEEK_API_KEY` | 官方DeepSeek看图故事接口密钥 |
 | `SEEDREAM_API_KEY` / `SEEDREAM_MODEL` | 方舟密钥与已开通模型；建议用户已验证的 `doubao-seedream-5-0-flash-260915` |
 | `CAT_AUTO_GENERATE=false` | 隔离测试时关闭所有付费生成 |
 | `CAT_DEVICE_ID` / `CAT_DEVICE_TOKEN` | 可选预置设备，token至少24字符；也可登录后在设置页生成；已保存的轮换凭证优先于环境预置值 |
 
-服务器模式默认先进入 `/login`。本机局域网测试可显式设置 `CAT_REQUIRE_LOGIN=false`，直接访问网站并隐藏退出登录按钮；设备上传仍需独立凭证。此开关默认保持登录保护，Compose正式部署模板不关闭登录。登录后在空间设置生成设备上传配置；凭证只显示一次，同名设备重新生成会使旧凭证失效。模型配置与照片接口要求网页登录，设备Bearer凭证没有管理权限。会话有效期8小时，服务重启后重新登录；登录失败10次/10分钟限流。
+按用户要求，网站默认免登录，普通启动、Docker和Compose均直接进入页面，访问旧的 `/login` 地址也会返回首页。设备上传仍需独立凭证。需要登录时显式设置 `CAT_REQUIRE_LOGIN=true` 并配置至少12字符管理员密码；只有此模式才要求网页登录并显示退出按钮，会话有效期8小时，重启后重新登录，登录失败10次/10分钟限流。空间设置可生成设备上传配置；凭证仅显示一次，同名设备重新生成会使旧凭证失效。设备Bearer凭证不代替管理员会话。
+
+已有部署若显式设置过 `CAT_REQUIRE_LOGIN=true`，需改成false或移除该变量，并重建容器；更新源码不会替换运维平台保存的环境变量。部署后用无Cookie请求确认首页HTTP 200、`/api/capture` 返回 `requireLogin:false`。
 
 公网部署由反向代理提供HTTPS，保留原Host请求头；`CAT_PUBLIC_URL` 必须与浏览器地址一致。网站后台需能联网访问DeepSeek/Seedream；相机只需能访问网站上传地址。仅明确的局域网测试使用HTTP。`GET /healthz` 为无需登录的最小健康检查。
 
