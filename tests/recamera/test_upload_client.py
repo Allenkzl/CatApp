@@ -16,6 +16,10 @@ class Handler(BaseHTTPRequestHandler):
         pass
     def do_POST(self):
         content=self.rfile.read(int(self.headers.get('Content-Length',0)))
+        if self.headers.get('User-Agent','').startswith('Python-urllib/'):
+            self.send_response(403)
+            self.end_headers()
+            return
         type(self).observed.append((self.path,content,self.headers.get('X-Catapp-Photo-Id')))
         self.send_response(type(self).code)
         if type(self).code==302:

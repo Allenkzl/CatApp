@@ -58,3 +58,11 @@ python3 -u /userdata/catapp-uploader/upload_to_website.py --config /userdata/cat
 可对一个关闭付费生成、独立数据目录的测试后台运行 `--snapshot`，它会进行一次明确的无条件抓拍并上传，不能把它当作检测到猫或完整漫画链路验收。验收照片不能混入正式下一组猫照片。
 
 本轮已完成新相机一次真实抓拍→HTTP上传→后台ACK，使用独立目录与测试端口。完整三张猫图片现场测试仍需用户展示猫画面后验收；隔离软件测试覆盖三张组图、重复上传和重启恢复。
+
+## 云端 HTTPS 上传排障（2026-10-27）
+
+- 部分设备 Python 的 OpenSSL 默认 CA 路径指向构建机目录，导致 `CERTIFICATE_VERIFY_FAILED`。配置可选的 `ca_file`，指向设备上的可信 PEM CA 集合；始终保留证书和主机名验证。相机本轮使用 `/userdata/catapp-uploader/trusted-ca.pem`，迁移配置时须一并保留该文件。
+- 云端网关拒绝 `Python-urllib` 默认客户端标识，返回 HTTP 403 / error code 1010。上传器现明确发送 `User-Agent: CatApp-reCamera/1.0`；已在相机本机验证云端心跳 200。
+- 真实抓拍向正式站上传返回 HTTP 413，未入库。相机原图约 1.28–1.33 MB；需运维核对所有反向代理/Ingress 的请求体限制，将本项目图片上传上限设为 30 MB。仓库 `deploy/nginx.conf.example` 已包含 `client_max_body_size 30m;`，但仅修改仓库模板不会改变正在运行的外部代理。Nginx 修改后先 `nginx -t`，通过后 reload；其他代理使用对应配置。
+- 截至本轮结束，相机已回退本地 `http://192.168.6.245:4180` 持续上传；云端已登记设备，但没有照片入库，不能称为云端上传成功。设备配置和程序的 `before-cloud-*` 备份留在设备目录，本机云端凭证保存在忽略的 `.data/cloud-camera-config.json`。
+- 运维调整后：部署本分支上传器，恢复云端配置（含设备 token 与 ca_file），仅保留一个采集进程；先显式单张抓拍，确认 201/ACK、云端照片数量增加、原图可读取，再启动持续猫识别上传。当前云端模型密钥未配置；照片上传成功也不等于自动漫画已经可用。

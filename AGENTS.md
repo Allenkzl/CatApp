@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：无。本轮已按用户确认将 `feature/device-upload-deployment` 无冲突合并到 `main`，当前主分支为 `main`；GitHub仓库 https://github.com/Allenkzl/CatApp （当前公开），本轮同步创建远端main并设为默认分支。远端旧功能分支保留供运维切换Webhook，本地已合并分支按规则清理。
+- 活跃分支：`fix/camera-cloud-upload`，修复设备 HTTPS CA 配置及云端客户端标识兼容；真实照片上传仍被线上代理 413 阻挡，已回退本地采集。本轮已按用户确认将 `feature/device-upload-deployment` 无冲突合并到 `main`，当前主分支为 `main`；GitHub仓库 https://github.com/Allenkzl/CatApp （当前公开），本轮同步创建远端main并设为默认分支。远端旧功能分支保留供运维切换Webhook，本地已合并分支按规则清理。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：持续真实抓拍、同摄像头同北京日期按 N 张组图、DeepSeek 英文故事、Seedream 英文手绘漫画、原图回看和 PNG 下载；两篇2560×1440真实绘图已生成。旧事件和作品保留，review/studio 导航注释且路由暂停。
 
@@ -79,3 +79,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-26 | feature/device-upload-deployment | 按用户授权将完整运行资料加密包及恢复指引上传GitHub Release，解密口令保存Secrets；远端218673936字节及SHA256与本地一致，原始文件保留，不能每次自动部署都重置数据。 |
 | 2026-10-26 | main | 按用户确认no-ff合并feature/device-upload-deployment，无冲突；更新交付主线为main，同步远端main及默认分支，清理本地已合并分支，远端功能分支暂保留兼容现有Webhook。 |
 | 2026-10-26 | main | 用户要求正式站默认免登录，修复此前只关闭本地、Docker/Compose仍启用登录的问题；统一默认false并透传开关，显式true可启用，设备鉴权保留；35项后端及浏览器验证通过，功能修复4b21788已推main；推送后线上仍303到/login，待运维切main重建并核对平台环境变量，不能标记线上验收完成。 |
+
+| 2026-10-27 | fix/camera-cloud-upload | 设备上传支持 ca_file 并明确客户端标识，6项设备测试通过、相机云端心跳200；真实约1.3MB照片被线上代理413拒绝，未入库，已备份并回退本地上传，待运维调整请求体上限后重测。 |

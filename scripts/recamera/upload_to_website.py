@@ -36,7 +36,7 @@ class UploadClient:
             raise ValueError('HTTPS required; allow_http_lan is only for explicit LAN tests')
         self.token = config['token']
         self.device_id = config['device_id']
-        self.ctx = ssl.create_default_context()
+        self.ctx = ssl.create_default_context(cafile=config.get('ca_file'))
         # Do not follow redirects with an Authorization header to another host.
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *args, **kwargs):
@@ -44,7 +44,7 @@ class UploadClient:
         self.opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=self.ctx), urllib.request.ProxyHandler({}))
 
     def request(self, route, body, headers):
-        request = urllib.request.Request(self.base + route, data=body, headers={**headers, 'Authorization': 'Bearer ' + self.token}, method='POST')
+        request = urllib.request.Request(self.base + route, data=body, headers={**headers, 'User-Agent': 'CatApp-reCamera/1.0', 'Authorization': 'Bearer ' + self.token}, method='POST')
         with self.opener.open(request, timeout=30) as response:
             return json.load(response)
 
