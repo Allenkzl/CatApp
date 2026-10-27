@@ -34,18 +34,18 @@ try{
  async function upload(i){return fetch(base+'/api/device/photos',{method:'POST',headers:{...uploadHeaders,'X-Catapp-Photo-Id':'smoke-'+i,'X-Catapp-Captured-At':`2026-10-21T10:0${i}:00+08:00`},body:photo});}
  for(let i=0;i<3;i++)assert.equal((await upload(i)).status,201);
  assert.equal((await upload(0)).status,200);
- let s=await snapshot(auth);assert.equal(s.photos.length,3);assert.equal(s.works.length,1);assert.equal(s.works[0].status,'ready_for_generation');
+ let s=await snapshot(auth);assert.equal(s.photos.length,3);assert.equal(s.works.length,0);assert.equal(s.settings.generationMode,'daily');
  assert.equal((await fetch(base+'/api/capture/photos/'+s.photos[0].id+'.jpg',{headers:host,redirect:'manual'})).status,401);
  assert.equal((await fetch(base+'/.data/secrets.json',{headers:auth})).status,403);
  docker('stop','-t','10',name);docker('rm',name);created=false;
- await start();const restoredAuth=await login();s=await snapshot(restoredAuth);assert.equal(s.photos.length,3);assert.equal(s.works.length,1);
+ await start();const restoredAuth=await login();s=await snapshot(restoredAuth);assert.equal(s.photos.length,3);assert.equal(s.works.length,0);
  assert.equal((await upload(0)).status,200);assert.equal((await snapshot(restoredAuth)).photos.length,3);
  docker('stop','-t','10',name);docker('rm',name);created=false;
  await writeFile(path.join(temp,'env'),'CAT_MODE=server\nCAT_PUBLIC_URL=http://catapp-smoke.invalid\nCAT_AUTO_GENERATE=false\nDEEPSEEK_API_KEY=\nSEEDREAM_API_KEY=\n',{mode:0o600});await start();
  const open=await fetch(base+'/api/capture',{headers:host});assert.equal(open.status,200);const state=await open.json();assert.equal(state.requireLogin,false);assert.equal(state.photos.length,3);
  const noLogin=await fetch(base+'/login',{headers:host,redirect:'manual'});assert.equal(noLogin.status,303);assert.equal(noLogin.headers.get('location'),'/');assert.equal((await fetch(base+'/',{headers:host})).status,200);
  assert.equal((await fetch(base+'/api/device/photos',{method:'POST',headers:host})).status,401);
- console.log('PASS: non-root/read-only container, default direct access and explicit login, device registration, 3 uploads, grouping, duplicate ACK, private media, container replacement with persistent data and device credentials. No paid API calls.');
+ console.log('PASS: non-root/read-only container, default direct access and explicit login, device registration, 3 uploads without premature grouping, duplicate ACK, private media, container replacement with persistent data and device credentials. No paid API calls.');
 }catch(error){console.error('FAIL:',error.message);process.exitCode=1;}
 finally{
  try{if(created)docker('rm','-f',name);}catch{console.error('Cleanup needed: '+name);}

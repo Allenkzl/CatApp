@@ -50,6 +50,7 @@ const server=http.createServer(async(req,res)=>{
    if(!['GET','POST'].includes(req.method))return json(res,405,{error:'Method not allowed'});
    if(req.method==='POST'){
     if(pathname==='/api/devices'){const input=await body(req);return json(res,201,await store.enqueue(()=>access.register(input.deviceId)));}
+    if(pathname==='/api/daily/preview'){const input=await body(req);return json(res,200,store.previewDay(input.date,input.cameraId));}
     if(pathname==='/api/settings')return json(res,200,await store.updateSettings(await body(req)));
     if(pathname==='/api/collector'){if(config.server)return json(res,409,{error:'SSH collection is disabled in server mode'});return json(res,200,await collector.configure(await body(req)));}
     if(pathname==='/api/drawing-config')return json(res,200,await auto.drawing.configure(await body(req)));

@@ -1,5 +1,15 @@
 // Canonical Chinese copy and its English presentation. Business values stay unchanged.
 export const messages = Object.fromEntries(`
+从早到晚，|From morning to night,
+收好一天的猫咪故事。|keep a diary of the cat’s day.
+每天归档，次日生成一篇英文总结漫画。|Archive each day and create one English diary the next day.
+按北京时间归档，次日汇总|Archive by Beijing date; summarize the next day
+待总结素材|Awaiting daily summary
+已保存到网站作品库|Saved in the website library
+一天的素材归档后，次日整理成英文总结漫画。|The day’s snapshots become an English diary the next day.
+当天持续收图，次日北京时间统一进入总结队列。|Collect today’s photos and queue the daily summary the next day, Beijing time.
+从当天观测里，挑出值得记住的猫咪日常。|Remember the highlights of the observed day.
+
 收齐设定数量后，自动编写英文故事。|Once a group is full, its English story is written automatically.
 同摄像头同一天，按设置组图|Grouped by camera, day and configured count
 英文故事自动生成，手绘待接入|Automatic English story; illustration pending
@@ -430,7 +440,7 @@ Open Datalogger × Seeed · 来源批次|Open Datalogger × Seeed · Source batc
 今天也是平凡又可爱的一天。|Another ordinary, lovely day.
 新导入素材，请人工填写观察对象、行为和实际片段时长。|Newly imported media. Please enter the subject, activity and actual clip duration.
 仅导出记录与作品，不包含素材文件。|Records and works only; media files are not included.
-`.trim().split('\n').map(line => line.split('|')));
+`.trim().split('\n').filter(Boolean).map(line => line.split('|')));
 
 // Existing English decorative copy also follows Chinese mode. Product names stay as brands.
 export const chineseDecorations = {
