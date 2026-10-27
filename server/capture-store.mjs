@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {htmlFor, translate, workTitle} from '../src/i18n.js';
 import {esc} from '../src/art.js';
 import {validatePublication} from './comic-publication.mjs';
+import {DAILY_DEFAULTS,beijingDay,dueAt,dailyPlan,dailyId,validDay} from './daily-summary.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex').slice(0,24);
 const inside=(root,file)=>{const rel=path.relative(root,file);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
@@ -36,7 +37,7 @@ function localDate(iso){
  return {date:parts.slice(0,10),time:parts.slice(11,19),capturedAt:time.toISOString()};
 }
 export class CaptureStore {
- constructor({inputRoot,dataDir}){this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
+ constructor({inputRoot,dataDir,now=()=>new Date(),generationMode='daily'}){this.now=now;this.generationMode=generationMode;this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
  async init(){
   await mkdir(path.join(this.dataDir,'media'),{recursive:true});
   await mkdir(path.join(this.dataDir,'comics'),{recursive:true});
@@ -44,7 +45,12 @@ export class CaptureStore {
   catch(error){if(error.code!=='ENOENT')throw new Error('抓拍数据索引损坏，已停止同步以保留原文件。');}
   this.index.settings ||= {batchPhotoCount:3};this.index.groups ||= [];
   let migrated=false;
-  for(const work of this.index.works)if(work.mode==='photo-layout'){work.previewUrl=work.comicUrl;work.comicUrl=null;work.mode='illustrated-comic';work.status='ready_for_generation';migrated=true;}
+  if(this.generationMode==='daily'&&this.index.settings.generationMode!=='daily'){
+   this.index.settings={...this.index.settings,...DAILY_DEFAULTS,dailyStartDate:beijingDay(this.now())};
+   for(const work of this.index.works)if(work.status!=='completed'&&work.kind!=='daily-summary'){work.legacyStatus=work.status;work.status='legacy_paused';}
+   this.index.groups=[];migrated=true;
+  }
+  for(const work of this.index.works)if(work.mode==='photo-layout'&&work.status!=='legacy_paused'){work.previewUrl=work.comicUrl;work.comicUrl=null;work.mode='illustrated-comic';work.status='ready_for_generation';migrated=true;}
   if(migrated)await this.save();
   await this.sync();return this;
  }
@@ -56,7 +62,7 @@ export class CaptureStore {
   if(!this.inputRoot){this.status='direct';if(this.groupUnassigned()||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}return this.snapshot();}
   let dirs,root;
   try{root=await realpath(this.inputRoot);dirs=await readdir(root,{withFileTypes:true});this.status='watching';}
-  catch(error){this.status='waiting';this.errors.push(error.code==='ENOENT'?'等待采集目录出现。':'暂时无法读取采集目录。');return this.snapshot();}
+  catch(error){this.status='waiting';this.errors.push(error.code==='ENOENT'?'等待采集目录出现。':'暂时无法读取采集目录。');if(this.groupUnassigned()||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}return this.snapshot();}
   for(const entry of dirs.sort((a,b)=>a.name.localeCompare(b.name))){
    if(!entry.isDirectory()||!/^cats-[a-zA-Z0-9-]+$/.test(entry.name))continue;
    const dir=path.join(root,entry.name);
@@ -79,7 +85,7 @@ export class CaptureStore {
       const fileStat=await stat(file);if(!fileStat.isFile()||fileStat.size>30*1024*1024)throw new Error('照片文件大小不支持');
       const buffer=await readFile(file),dimensions=jpegSize(buffer),when=localDate(record.captured_at);
       const target=path.join(this.dataDir,'media',photoId+'.jpg');await writeFile(target+'.part',buffer);await rename(target+'.part',target);
-      this.index.photos.push({id:photoId,session:entry.name,name,cameraId:typeof record.camera_id==='string'?record.camera_id.slice(0,100):'recamera-default',...when,...dimensions,score:Number.isFinite(record.score)&&record.score>=0&&record.score<=1?record.score:null,url:`/api/capture/photos/${photoId}.jpg`,source:'reCamera',identity:'unknown'});changed=true;
+      this.index.photos.push({id:photoId,session:entry.name,name,cameraId:typeof record.camera_id==='string'?record.camera_id.slice(0,100):'recamera-default',...when,...dimensions,contentHash:createHash('sha256').update(buffer).digest('hex'),score:Number.isFinite(record.score)&&record.score>=0&&record.score<=1?record.score:null,url:`/api/capture/photos/${photoId}.jpg`,source:'reCamera',identity:'unknown'});changed=true;
      }catch(error){this.errors.push(`${entry.name}：${error.code==='ENOENT'?'照片尚未就绪':error.message}`);}
     }
    }catch(error){if(error.code!=='ENOENT')this.errors.push(`${entry.name}：${error instanceof SyntaxError?'清单正在更新，稍后重试':error.message}`);}
@@ -89,7 +95,25 @@ export class CaptureStore {
   if(changed||this.unsaved){this.unsaved=true;await this.save();this.unsaved=false;}
   return this.snapshot();
  }
+ previewDay(day,cameraId){
+  if(!validDay(day)){const e=new Error('Invalid date');e.statusCode=400;throw e;}
+  const cameras=[...new Set(this.index.photos.filter(p=>p.date===day).map(p=>p.cameraId||'recamera-default'))];
+  return {previewOnly:true,paidGeneration:false,date:day,plans:cameras.filter(id=>!cameraId||id===cameraId).map(id=>dailyPlan(this.index.photos,day,id,this.index.settings.panelCount||8))};
+ }
+ scheduleDaily(){
+  let changed=false;const settings=this.index.settings,now=this.now();
+  const keys=new Map(this.index.photos.map(p=>[(p.cameraId||'recamera-default')+'/'+p.date,{date:p.date,cameraId:p.cameraId||'recamera-default'}]));
+  for(const {date,cameraId} of keys.values()){
+   if(date<settings.dailyStartDate||dueAt(date,settings.dailyTime)>now)continue;
+   const id=dailyId(cameraId,date);if(this.index.works.some(w=>w.id===id))continue;
+   const plan=dailyPlan(this.index.photos,date,cameraId,settings.panelCount);
+   if(!plan.photoIds.length)continue;
+   this.index.works.push({...plan,id,kind:'daily-summary',title:`Daily Cat Summary · ${date}`,createdAt:now.toISOString(),scheduledFor:dueAt(date,settings.dailyTime).toISOString(),mode:'illustrated-comic',status:'ready_for_generation',comicUrl:null});changed=true;
+  }
+  return changed;
+ }
  groupUnassigned(){
+  if(this.index.settings.generationMode==='daily')return this.scheduleDaily();
   let changed=false;
   const assigned=new Set(this.index.works.flatMap(w=>w.photoIds));
   const groups=new Map();
@@ -110,11 +134,12 @@ export class CaptureStore {
   return changed;
  }
  snapshot(){
-  const assigned=new Set(this.index.works.flatMap(w=>w.photoIds)),pending=[];
+  const daily=this.index.settings.generationMode==='daily';
+  const assigned=new Set(this.index.works.filter(w=>!daily||w.kind==='daily-summary').flatMap(w=>w.allPhotoIds||w.photoIds)),pending=[];
   for(const photo of this.index.photos.filter(p=>!assigned.has(p.id))){
    const key=(photo.cameraId||'recamera-default')+'/'+photo.date;
    let group=pending.find(g=>g.key===key);
-   if(!group){group={key,session:photo.session,date:photo.date,count:0,target:this.index.groups.find(g=>g.key===key)?.target||this.index.settings.batchPhotoCount};pending.push(group);}group.count++;
+   if(!group){group={key,session:photo.session,date:photo.date,count:0,target:daily?null:this.index.groups.find(g=>g.key===key)?.target||this.index.settings.batchPhotoCount};pending.push(group);}group.count++;
   }
   return {...this.index,pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
  }
@@ -134,6 +159,11 @@ export class CaptureStore {
   return {photoId:id,duplicate:false};
  });}
  updateSettings(input){return this.enqueue(async()=>{
+  if(this.index.settings.generationMode==='daily'){
+   if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(input?.dailyTime||'')||![6,7,8].includes(input?.panelCount)){const e=new Error('Use HH:mm and 6–8 panels');e.statusCode=400;throw e;}
+   const old=this.index;this.index=structuredClone(old);this.index.settings={...this.index.settings,dailyTime:input.dailyTime,panelCount:input.panelCount};
+   try{await this.save();}catch(e){this.index=old;throw e;}return this.snapshot();
+  }
   if(!Number.isInteger(input?.batchPhotoCount)||input.batchPhotoCount<1||input.batchPhotoCount>12){const e=new Error('Photo count must be an integer from 1 to 12');e.statusCode=400;throw e;}
   const previous=this.index.settings;this.index.settings={batchPhotoCount:input.batchPhotoCount};
   try{await this.save();}catch(e){this.index.settings=previous;throw e;}return this.snapshot();
@@ -152,6 +182,7 @@ export class CaptureStore {
  setGeneration(id,input){return this.enqueue(async()=>{
   const work=this.index.works.find(w=>w.id===id);
   if(!work){const error=new Error('Unknown capture batch');error.statusCode=404;throw error;}
+  if(work.status==='legacy_paused'){const e=new Error('Legacy batches are paused; their photos are retained for daily summaries');e.statusCode=409;throw e;}
   if(!['ready_for_generation','awaiting_image_provider','generating','failed'].includes(input?.status)){const error=new Error('Invalid generation state');error.statusCode=400;throw error;}
   if(input.status==='awaiting_image_provider'&&!work.story){const error=new Error('A storyboard is required before drawing');error.statusCode=400;throw error;}
   const next={...work,status:input.status};

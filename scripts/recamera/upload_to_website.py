@@ -36,7 +36,10 @@ class UploadClient:
             raise ValueError('HTTPS required; allow_http_lan is only for explicit LAN tests')
         self.token = config['token']
         self.device_id = config['device_id']
-        self.ctx = ssl.create_default_context()
+        self.max_upload_bytes = config.get('max_upload_bytes', 900 * 1024)
+        if not isinstance(self.max_upload_bytes, int) or not 1024 <= self.max_upload_bytes <= 30 * 1024 * 1024:
+            raise ValueError('max_upload_bytes must be between 1024 and 30 MiB')
+        self.ctx = ssl.create_default_context(cafile=config.get('ca_file'))
         # Do not follow redirects with an Authorization header to another host.
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *args, **kwargs):
@@ -44,11 +47,12 @@ class UploadClient:
         self.opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=self.ctx), urllib.request.ProxyHandler({}))
 
     def request(self, route, body, headers):
-        request = urllib.request.Request(self.base + route, data=body, headers={**headers, 'Authorization': 'Bearer ' + self.token}, method='POST')
+        request = urllib.request.Request(self.base + route, data=body, headers={**headers, 'User-Agent': 'CatApp-reCamera/1.0', 'Authorization': 'Bearer ' + self.token}, method='POST')
         with self.opener.open(request, timeout=30) as response:
             return json.load(response)
 
     def upload(self, file, metadata):
+        prepare_upload(file, self.max_upload_bytes)
         result = self.request('/api/device/photos', file.read_bytes(), {'Content-Type': 'image/jpeg', 'X-Catapp-Photo-Id': metadata['photo_id'], 'X-Catapp-Captured-At': metadata['captured_at']})
         if result.get('accepted') is not True or not result.get('photoId'):
             raise RuntimeError('Server did not acknowledge the photo')
@@ -56,6 +60,39 @@ class UploadClient:
 
     def heartbeat(self, watching):
         return self.request('/api/device/heartbeat', b'', {'X-Catapp-State': 'watching' if watching else 'connected'})
+
+
+def prepare_upload(file, limit):
+    """Persist bounded JPEG bytes before sending; retries reuse identical bytes."""
+    if file.stat().st_size <= limit:
+        return
+    # Firmware Pillow JPEG codecs may fail on hardware frames. Use the
+    # device's OpenCV codec for both decoding and encoding.
+    import cv2
+    image = cv2.imread(str(file))
+    if image is None:
+        raise ValueError('Cannot decode camera JPEG')
+    while True:
+        for quality in (90, 80, 70, 60, 50):
+            encoded, output = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            if not encoded:
+                raise ValueError('Cannot encode camera JPEG')
+            data = output.tobytes()
+            if len(data) <= limit:
+                temporary = file.with_suffix(file.suffix + '.upload.tmp')
+                try:
+                    with temporary.open('wb') as stream:
+                        stream.write(data)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    temporary.replace(file)
+                finally:
+                    temporary.unlink(missing_ok=True)
+                return
+        height, width = image.shape[:2]
+        if (width, height) == (1, 1):
+            raise ValueError('Cannot fit JPEG within upload limit')
+        image = cv2.resize(image, (max(1, width * 3 // 4), max(1, height * 3 // 4)), interpolation=cv2.INTER_AREA)
 
 
 async def run(config, snapshot=False):
