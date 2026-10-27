@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`fix/camera-cloud-upload`，修复设备 HTTPS CA 配置及云端客户端标识兼容；真实照片上传仍被线上代理 413 阻挡，已回退本地采集。本轮已按用户确认将 `feature/device-upload-deployment` 无冲突合并到 `main`，当前主分支为 `main`；GitHub仓库 https://github.com/Allenkzl/CatApp （当前公开），本轮同步创建远端main并设为默认分支。远端旧功能分支保留供运维切换Webhook，本地已合并分支按规则清理。
+- 活跃分支：`fix/camera-cloud-upload`，修复设备 HTTPS CA 配置、客户端标识和上传前压缩；相机现直传云端，单张真实抓拍已入库，待现场新猫识别和云端模型配置验收。本轮已按用户确认将 `feature/device-upload-deployment` 无冲突合并到 `main`，当前主分支为 `main`；GitHub仓库 https://github.com/Allenkzl/CatApp （当前公开），本轮同步创建远端main并设为默认分支。远端旧功能分支保留供运维切换Webhook，本地已合并分支按规则清理。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：持续真实抓拍、同摄像头同北京日期按 N 张组图、DeepSeek 英文故事、Seedream 英文手绘漫画、原图回看和 PNG 下载；两篇2560×1440真实绘图已生成。旧事件和作品保留，review/studio 导航注释且路由暂停。
 
@@ -81,3 +81,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-26 | main | 用户要求正式站默认免登录，修复此前只关闭本地、Docker/Compose仍启用登录的问题；统一默认false并透传开关，显式true可启用，设备鉴权保留；35项后端及浏览器验证通过，功能修复4b21788已推main；推送后线上仍303到/login，待运维切main重建并核对平台环境变量，不能标记线上验收完成。 |
 
 | 2026-10-27 | fix/camera-cloud-upload | 设备上传支持 ca_file 并明确客户端标识，6项设备测试通过、相机云端心跳200；真实约1.3MB照片被线上代理413拒绝，未入库，已备份并回退本地上传，待运维调整请求体上限后重测。 |
+
+| 2026-10-27 | fix/camera-cloud-upload | 新增默认900KiB上传前压缩及稳定重试，使用设备OpenCV兼容硬件JPEG；8项测试通过，真实单张825337字节直传云端并可读，相机持续进程3986在线；模型未配置，未宣称自动漫画或新cat触发验收完成。 |

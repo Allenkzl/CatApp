@@ -7,7 +7,7 @@ import unittest
 import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts' / 'recamera'))
-from upload_to_website import UploadClient
+from upload_to_website import UploadClient, prepare_upload
 
 class Handler(BaseHTTPRequestHandler):
     code=201
@@ -28,6 +28,28 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({'accepted':True,'photoId':'server-id'}).encode())
 
 class UploadTests(unittest.TestCase):
+    def test_large_jpeg_fits_limit_and_retry_bytes_stay_identical(self):
+        from PIL import Image
+        import random
+        with tempfile.TemporaryDirectory() as directory:
+            file=Path(directory)/'large.jpg'
+            image=Image.frombytes('RGB',(800,600),random.Random(42).randbytes(800*600*3))
+            image.save(file,quality=98)
+            self.assertGreater(file.stat().st_size,50000)
+            prepare_upload(file,50000)
+            first=file.read_bytes()
+            self.assertLessEqual(len(first),50000)
+            with Image.open(file) as decoded:
+                decoded.load()
+                self.assertEqual(decoded.format,'JPEG')
+            prepare_upload(file,50000)
+            self.assertEqual(first,file.read_bytes())
+    def test_small_file_is_not_reencoded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file=Path(directory)/'small.jpg'
+            file.write_bytes(b'unchanged-small-image')
+            prepare_upload(file,900*1024)
+            self.assertEqual(file.read_bytes(),b'unchanged-small-image')
     def setUp(self):
         Handler.code=201
         Handler.observed=[]
