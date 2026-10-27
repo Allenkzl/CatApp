@@ -75,3 +75,7 @@ python3 -u /userdata/catapp-uploader/upload_to_website.py --config /userdata/cat
 - 显式单张真实抓拍已上传云端：照片 ID `9ccfb6412afff3929b9b65b0`，825337 字节，云端原图 HTTP 200；设备在线，后端记录数由0增至1。该单张为显式传输验收；持续阶段随后新增第二张 `d8c60a3da6a5cb8def882858`（相机时间 2026-10-27T01:38:07.954Z），云端总数增至2，设备 state=watching。此阶段未再次执行手动抓拍，已观察到自动采集新增；不同猫咪动作的现场效果仍由用户继续测试。
 - 云端 DeepSeek/Seedream 仍未配置，此阶段仅验收收图；自动故事/漫画尚不可用。设备目前仍无系统开机守护，重启后需恢复采集进程。不要把进程在线等同于已部署开机自启。
 - 回归验证：8项 Python 设备测试通过，包括超限 JPEG 压缩、图片可解码、重试字节一致、小图不变及上传/重定向检查。
+
+### 云端模型配置补齐（2026-10-27）
+
+用户授权后，已从本机私有配置经正式HTTPS接口写入DeepSeek和Seedream密钥，两次保存HTTP200，公开状态 `deepseekConfigured=true`、`drawingConfigured=true`，绘图模型 `doubao-seedream-5-0-flash-260915`。仅在云端数据目录保存私有配置，不含于Git。此时云端2张照片、0篇作品，尚未实测供应商调用或成品生成。公开状态未暴露 `CAT_AUTO_GENERATE`，而Compose模板默认false；运维仍需确认运行环境开启后再验收自动故事/绘图，不要把configured当作真实生成成功。
