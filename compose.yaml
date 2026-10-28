@@ -27,6 +27,7 @@ services:
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       SEEDREAM_API_KEY: "${SEEDREAM_API_KEY:-}"
       SEEDREAM_MODEL: "${SEEDREAM_MODEL:-doubao-seedream-5-0-flash-260915}"
+      # Legacy batch fallback only; daily mode is controlled in website settings.
       CAT_AUTO_GENERATE: "${CAT_AUTO_GENERATE:-false}"
     volumes:
       - type: bind

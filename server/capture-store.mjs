@@ -50,6 +50,10 @@ export class CaptureStore {
    for(const work of this.index.works)if(work.status!=='completed'&&work.kind!=='daily-summary'){work.legacyStatus=work.status;work.status='legacy_paused';}
    this.index.groups=[];migrated=true;
   }
+  if(this.index.settings.generationMode==='daily'){
+   if(this.index.settings.autoGenerateEnabled===undefined){this.index.settings.autoGenerateEnabled=true;migrated=true;}
+   if(typeof this.index.settings.autoGenerateEnabled!=='boolean')throw new Error('Invalid saved automatic-generation setting');
+  }
   for(const work of this.index.works)if(work.mode==='photo-layout'&&work.status!=='legacy_paused'){work.previewUrl=work.comicUrl;work.comicUrl=null;work.mode='illustrated-comic';work.status='ready_for_generation';migrated=true;}
   if(migrated)await this.save();
   await this.sync();return this;
@@ -160,8 +164,11 @@ export class CaptureStore {
  });}
  updateSettings(input){return this.enqueue(async()=>{
   if(this.index.settings.generationMode==='daily'){
-   if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(input?.dailyTime||'')||![6,7,8].includes(input?.panelCount)){const e=new Error('Use HH:mm and 6–8 panels');e.statusCode=400;throw e;}
-   const old=this.index;this.index=structuredClone(old);this.index.settings={...this.index.settings,dailyTime:input.dailyTime,panelCount:input.panelCount};
+   const fields=['dailyTime','panelCount','autoGenerateEnabled'];
+   const patch=Object.fromEntries(fields.filter(k=>Object.hasOwn(input||{},k)).map(k=>[k,input[k]]));
+   const next={...this.index.settings,...patch};
+   if(!Object.keys(patch).length||!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.dailyTime||'')||![6,7,8].includes(next.panelCount)||typeof next.autoGenerateEnabled!=='boolean'){const e=new Error('Use HH:mm, 6–8 panels and a boolean automatic-generation switch');e.statusCode=400;throw e;}
+   const old=this.index;this.index=structuredClone(old);this.index.settings=next;
    try{await this.save();}catch(e){this.index=old;throw e;}return this.snapshot();
   }
   if(!Number.isInteger(input?.batchPhotoCount)||input.batchPhotoCount<1||input.batchPhotoCount>12){const e=new Error('Photo count must be an integer from 1 to 12');e.statusCode=400;throw e;}

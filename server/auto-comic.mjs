@@ -16,12 +16,13 @@ export class AutoComic {
   for(const w of this.store.index.works)if(['generating','drawing'].includes(w.status))await this.store.updateJob(w.id,{status:w.status==='drawing'?'image_failed':'failed',error:'Service restarted during generation. Retry manually.',retryAt:null});
   return this;
  }
- snapshot(){return {workerEnabled:process.env.CAT_AUTO_GENERATE!=='false',workerBlockedReason:process.env.CAT_AUTO_GENERATE==='false'?'CAT_AUTO_GENERATE=false':null,deepseekConfigured:!!this.key,storyModel:'deepseek-flash',...this.drawing.snapshot()};}
+ enabled(){return this.store.index.settings.generationMode==='daily'?this.store.index.settings.autoGenerateEnabled===true:process.env.CAT_AUTO_GENERATE!=='false';}
+ snapshot(){const daily=this.store.index.settings.generationMode==='daily';return {workerEnabled:this.enabled(),workerSource:daily?'website_setting':'environment',workerRunning:!!this.running,workerBlockedReason:this.enabled()?null:daily?'website_setting_disabled':'CAT_AUTO_GENERATE=false',deepseekConfigured:!!this.key,storyModel:'deepseek-flash',...this.drawing.snapshot()};}
  async configure(input){
   if(typeof input?.deepseekKey!=='string'||!/^sk-[A-Za-z0-9_-]{10,200}$/.test(input.deepseekKey)){const e=new Error('Invalid API key');e.statusCode=400;throw e;}
   const file=path.join(this.store.dataDir,'secrets.json');await writeFile(file+'.tmp',JSON.stringify({deepseekKey:input.deepseekKey}),{mode:0o600});await chmod(file+'.tmp',0o600);await rename(file+'.tmp',file);this.key=input.deepseekKey;return this.snapshot();
  }
- tick(){if(this.running)return this.running;this.running=this.run().finally(()=>this.running=null);return this.running;}
+ tick(){if(!this.enabled())return this.running||Promise.resolve();if(this.running)return this.running;this.running=this.run().finally(()=>this.running=null);return this.running;}
  async draw(work){
   await this.store.updateJob(work.id,{status:'drawing',error:null,generationStage:'image'});
   try{const result=await this.drawing.generate(work);await this.store.publish(work.id,result);}

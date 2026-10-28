@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-export const DAILY_DEFAULTS={generationMode:'daily',dailyTime:'00:10',panelCount:8};
+export const DAILY_DEFAULTS={generationMode:'daily',dailyTime:'00:10',panelCount:8,autoGenerateEnabled:true};
 export function beijingDay(now=new Date()){return new Date(new Date(now).getTime()+8*3600000).toISOString().slice(0,10);}
 export function validDay(day){return typeof day==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(day)&&Number.isFinite(Date.parse(day))&&new Date(day).toISOString().slice(0,10)===day;}
 export function dueAt(day,time='00:10'){return new Date(Date.parse(day+'T00:00:00+08:00')+86400000+Number(time.slice(0,2))*3600000+Number(time.slice(3))*60000);}

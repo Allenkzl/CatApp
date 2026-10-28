@@ -73,7 +73,7 @@ const server=http.createServer(async(req,res)=>{
  }catch(error){if(!res.headersSent)return json(res,error.statusCode||(error.code==='ENOENT'||error.message==='not found'?404:500),{error:error.statusCode?error.message:'Unable to complete request'});res.end();}
 });
 server.requestTimeout=60000;server.headersTimeout=15000;
-const timer=setInterval(()=>{store.sync().catch(()=>console.error('Capture sync failed'));if(process.env.CAT_AUTO_GENERATE!=='false')auto.tick().catch(()=>console.error('Comic worker failed'));},2000);timer.unref();
+const timer=setInterval(()=>{store.sync().catch(()=>console.error('Capture sync failed'));auto.tick().catch(()=>console.error('Comic worker failed'));},2000);timer.unref();
 server.on('error',error=>{clearInterval(timer);console.error(error.message);process.exitCode=1;});
 server.listen(config.port,config.host,()=>console.log(`CatApp ready: ${config.origin||'http://localhost:'+config.port} (${config.mode})`));
 for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{clearInterval(timer);await collector.stop();server.close(()=>process.exit(0));});

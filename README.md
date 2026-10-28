@@ -61,7 +61,7 @@ node --env-file=.env scripts/serve.mjs
 | `CAT_ADMIN_USER` / `CAT_ADMIN_PASSWORD` | 仅启用登录时需要管理员用户名与至少12字符密码；通过环境注入，不进入镜像/源码 |
 | `DEEPSEEK_API_KEY` | 官方DeepSeek看图故事接口密钥 |
 | `SEEDREAM_API_KEY` / `SEEDREAM_MODEL` | 方舟密钥与已开通模型；建议用户已验证的 `doubao-seedream-5-0-flash-260915` |
-| `CAT_AUTO_GENERATE=false` | 隔离测试时关闭所有付费生成 |
+| `CAT_AUTO_GENERATE` | 仅旧批次兼容开关；每日模式使用网站保存的自动生成开关，默认开启 |
 | `CAT_DEVICE_ID` / `CAT_DEVICE_TOKEN` | 可选预置设备，token至少24字符；也可登录后在设置页生成；已保存的轮换凭证优先于环境预置值 |
 
 按用户要求，网站默认免登录，普通启动、Docker和Compose均直接进入页面，访问旧的 `/login` 地址也会返回首页。设备上传仍需独立凭证。需要登录时显式设置 `CAT_REQUIRE_LOGIN=true` 并配置至少12字符管理员密码；只有此模式才要求网页登录并显示退出按钮，会话有效期8小时，重启后重新登录，登录失败10次/10分钟限流。空间设置可生成设备上传配置；凭证仅显示一次，同名设备重新生成会使旧凭证失效。设备Bearer凭证不代替管理员会话。
@@ -112,3 +112,5 @@ npm run verify:server
 旧版角色参考照片来自 Unsplash `photo-1573865526739-10659fec78a5` 和 `photo-1518791841217-8f162f1e1131`，仅作原型素材，不对应实际采集个体。画风参考为项目生成插画。
 
 每日一篇总结（北京时间次日00:10、6–8格、今日素材预览、旧批次暂停及上线步骤）见 [每日总结说明](docs/DAILY_SUMMARY.md)。
+
+自动生成每日漫画可在「空间设置」勾选/取消后保存，立即生效并随数据目录持久化，无需运维修改环境变量或重启。关闭时不再启动新请求，已发出的模型请求会完成保存。新版每日模式会忽略旧的 `CAT_AUTO_GENERATE=false`；隔离基础设施测试请用无密钥的独立数据目录并先在网站关闭自动生成。
