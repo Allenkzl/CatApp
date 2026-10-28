@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：无。小时全量验证版及网站开关修复已按用户“实现并上线”授权合并到main，主线保持main；本轮将main与历史部署兼容分支同步至同一发布内容，线上以release=hourly-comic-v1验收。Jenkins管理API403/浏览器需登录，不声称拥有发布平台管理权限。
+- 活跃分支：无。main的小时全量验证版已由运维成功部署；公开站确认release=hourly-comic-v1、summaryFrequency=hourly、workerEnabled=true，两套模型已配置。首轮计划北京时间2026-10-28 19:25:57入队，真实线上小时成品仍待验收。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
@@ -97,3 +97,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-28 | feature/hourly-comic-validation | 完成小时验证/每日切换、完整时段分批读图及缓存层级汇总、相册分页与迟到标记、英文排版规范化和Flash尺寸修复；56项后端测试、小时/每日/服务器浏览器验证通过，另用6张云端真照和真实DeepSeek/Seedream完成隔离生成；样例有格数编号偏差，保留未审核。用户授权上线，待合并发布及站点标记验收。 |
 
 | 2026-10-28 | main | 按本轮上线授权no-ff合并feature/hourly-comic-validation（含网站开关修复），无冲突；清理两个已合并本地分支。发布目标为main与历史部署兼容分支同一提交，禁止强推；正式站须核对hourly-comic-v1、hourly频率、workerEnabled及nextRunAt后才开始一小时验收。 |
+
+| 2026-10-28 | main | 运维修正更新流程后，容器及公开API均返回hourly-comic-v1/pipeline2；小时频率、网站自动开关和两套模型正常，204张原图保留，旧批次暂停，新窗口已开始。修正关键是同步origin/main、按提交号建镜像、CAT_IMAGE显式透传并force-recreate；首次小时入队19:25:57，尚不等于已生成成品。 |

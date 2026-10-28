@@ -203,3 +203,18 @@ docker compose --env-file deploy/.env up -d --no-build --pull never
 ## 技术参考
 
 配置语法参考 [Docker Compose环境变量](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)、[挂载目录](https://docs.docker.com/engine/storage/bind-mounts/)、[多架构构建](https://docs.docker.com/build/building/multi-platform/)。以上为项目部署设计；实际构建与服务器验收记录以运维回执为准。
+
+## 日常拉代码更新（2026-10-28 修正版）
+
+在项目部署目录执行；部署参数继续使用现有deploy/.env，数据挂载保留。显式fetch映射保证origin/main被更新，镜像按提交号命名，Compose显式使用刚构建的镜像。
+
+```sh
+set -eu
+git fetch origin refs/heads/main:refs/remotes/origin/main
+git reset --hard origin/main
+CATAPP_RELEASE_IMAGE="catapp:$(git rev-parse --short=12 HEAD)"
+docker build --pull -t "$CATAPP_RELEASE_IMAGE" .
+CAT_IMAGE="$CATAPP_RELEASE_IMAGE" docker compose --env-file deploy/.env up -d --no-build --pull never --force-recreate app
+```
+
+启动就绪后用容器内与公网/healthz交叉验证，必须包含release=hourly-comic-v1及summaryPipelineVersion=2（以后发布可提升版本）；只有status=ok不足以证明新代码上线。不要把git reset --hard main当成同步远端，也不要仅重启旧镜像。构建缓存清理属于独立维护，不是更新版本所必需。
