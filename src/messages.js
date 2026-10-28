@@ -1,5 +1,6 @@
 // Canonical Chinese copy and its English presentation. Business values stay unchanged.
 export const messages = Object.fromEntries(`
+按小时测试或按天归档，生成一篇英文总结漫画。|Create an English diary from hourly tests or daily archives.
 从早到晚，|From morning to night,
 收好一天的猫咪故事。|keep a diary of the cat’s day.
 每天归档，次日生成一篇英文总结漫画。|Archive each day and create one English diary the next day.

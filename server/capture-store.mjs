@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {htmlFor, translate, workTitle} from '../src/i18n.js';
 import {esc} from '../src/art.js';
 import {validatePublication} from './comic-publication.mjs';
-import {DAILY_DEFAULTS,beijingDay,dueAt,dailyPlan,dailyId,validDay} from './daily-summary.mjs';
+import {DAILY_DEFAULTS,beijingDay,dueAt,dailyPlan,dailyId,validDay,periodPlan,hourlyId,scheduleState,isSummary,workFrequency} from './daily-summary.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex').slice(0,24);
 const inside=(root,file)=>{const rel=path.relative(root,file);return rel!==''&&!rel.startsWith('..')&&!path.isAbsolute(rel);};
@@ -37,7 +37,7 @@ function localDate(iso){
  return {date:parts.slice(0,10),time:parts.slice(11,19),capturedAt:time.toISOString()};
 }
 export class CaptureStore {
- constructor({inputRoot,dataDir,now=()=>new Date(),generationMode='daily'}){this.now=now;this.generationMode=generationMode;this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
+ constructor({inputRoot,dataDir,now=()=>new Date(),generationMode='daily',initialFrequency='hourly'}){this.now=now;this.generationMode=generationMode;this.initialFrequency=initialFrequency;this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
  async init(){
   await mkdir(path.join(this.dataDir,'media'),{recursive:true});
   await mkdir(path.join(this.dataDir,'comics'),{recursive:true});
@@ -46,9 +46,17 @@ export class CaptureStore {
   this.index.settings ||= {batchPhotoCount:3};this.index.groups ||= [];
   let migrated=false;
   if(this.generationMode==='daily'&&this.index.settings.generationMode!=='daily'){
-   this.index.settings={...this.index.settings,...DAILY_DEFAULTS,dailyStartDate:beijingDay(this.now())};
+   this.index.settings={...this.index.settings,...DAILY_DEFAULTS,summaryFrequency:this.initialFrequency,dailyStartDate:beijingDay(this.now())};
    for(const work of this.index.works)if(work.status!=='completed'&&work.kind!=='daily-summary'){work.legacyStatus=work.status;work.status='legacy_paused';}
    this.index.groups=[];migrated=true;
+  }
+  if(this.index.settings.generationMode==='daily'){
+   if(!['hourly','daily'].includes(this.index.settings.summaryFrequency||this.initialFrequency))throw new Error('Invalid summary frequency');
+   if(this.index.settings.summaryFrequency===undefined){this.index.settings.summaryFrequency=this.initialFrequency;migrated=true;}
+   if(this.index.settings.summaryFrequency==='hourly'&&!this.index.settings.hourlyAnchorAt){this.index.settings.hourlyAnchorAt=this.now().toISOString();migrated=true;}
+   if(this.index.settings.summaryFrequency==='hourly'&&!Number.isFinite(Date.parse(this.index.settings.hourlyAnchorAt)))throw new Error('Invalid hourly anchor');
+   if(this.index.settings.autoGenerateEnabled===undefined){this.index.settings.autoGenerateEnabled=true;migrated=true;}
+   if(typeof this.index.settings.autoGenerateEnabled!=='boolean')throw new Error('Invalid saved automatic-generation setting');
   }
   for(const work of this.index.works)if(work.mode==='photo-layout'&&work.status!=='legacy_paused'){work.previewUrl=work.comicUrl;work.comicUrl=null;work.mode='illustrated-comic';work.status='ready_for_generation';migrated=true;}
   if(migrated)await this.save();
@@ -102,15 +110,40 @@ export class CaptureStore {
  }
  scheduleDaily(){
   let changed=false;const settings=this.index.settings,now=this.now();
+  if(settings.summaryFrequency==='hourly')return this.scheduleHourly(now);
   const keys=new Map(this.index.photos.map(p=>[(p.cameraId||'recamera-default')+'/'+p.date,{date:p.date,cameraId:p.cameraId||'recamera-default'}]));
   for(const {date,cameraId} of keys.values()){
    if(date<settings.dailyStartDate||dueAt(date,settings.dailyTime)>now)continue;
    const id=dailyId(cameraId,date);if(this.index.works.some(w=>w.id===id))continue;
-   const plan=dailyPlan(this.index.photos,date,cameraId,settings.panelCount);
+   const start=date+'T00:00:00+08:00',end=new Date(Date.parse(start)+86400000);
+   const plan=periodPlan(this.index.photos,start,end,cameraId,settings.panelCount);
    if(!plan.photoIds.length)continue;
    this.index.works.push({...plan,id,kind:'daily-summary',title:`Daily Cat Summary · ${date}`,createdAt:now.toISOString(),scheduledFor:dueAt(date,settings.dailyTime).toISOString(),mode:'illustrated-comic',status:'ready_for_generation',comicUrl:null});changed=true;
   }
   return changed;
+ }
+ scheduleHourly(now){
+  const anchor=Date.parse(this.index.settings.hourlyAnchorAt);if(!Number.isFinite(anchor))throw new Error('Invalid hourly schedule anchor');
+  const completed=Math.floor((now.getTime()-anchor)/3600000);if(completed<1)return false;
+  const windows=new Map();
+  for(const p of this.index.photos){const n=Math.floor((Date.parse(p.capturedAt)-anchor)/3600000);if(n<0||n>=completed)continue;const camera=p.cameraId||'recamera-default';windows.set(camera+'/'+n,{camera,n});}
+  let changed=false;
+  for(const {camera,n} of windows.values()){
+   const start=new Date(anchor+n*3600000),end=new Date(start.getTime()+3600000),id=hourlyId(camera,start);if(this.index.works.some(w=>w.id===id))continue;
+   const plan=periodPlan(this.index.photos,start,end,camera,this.index.settings.panelCount);if(!plan.photoIds.length)continue;
+   this.index.works.push({...plan,id,kind:'hourly-summary',title:`Hourly Cat Diary · ${plan.date} · ${plan.periodStart}`,createdAt:now.toISOString(),scheduledFor:end.toISOString(),mode:'illustrated-comic',status:'ready_for_generation',comicUrl:null});changed=true;
+  }
+  return changed;
+ }
+ workEligible(work){return this.index.settings.generationMode!=='daily'||!isSummary(work)||workFrequency(work)===(this.index.settings.summaryFrequency||'daily');}
+ albumIds(work){
+  if(!isSummary(work)||!work.periodStart||!work.periodEnd)return work.allPhotoIds||work.photoIds;
+  return this.index.photos.filter(p=>(p.cameraId||'recamera-default')===work.cameraId&&p.capturedAt>=work.periodStart&&p.capturedAt<work.periodEnd).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt)||a.id.localeCompare(b.id)).map(p=>p.id);
+ }
+ workPhotos(id,offset=0,limit=24){
+  const work=this.index.works.find(w=>w.id===id);if(!work){const e=new Error('Unknown work');e.statusCode=404;throw e;}
+  if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>48){const e=new Error('Invalid page');e.statusCode=400;throw e;}
+  const ids=this.albumIds(work);return {workId:id,total:ids.length,offset,photos:ids.slice(offset,offset+limit).map(id=>this.index.photos.find(p=>p.id===id)).filter(Boolean),nextOffset:offset+limit<ids.length?offset+limit:null};
  }
  groupUnassigned(){
   if(this.index.settings.generationMode==='daily')return this.scheduleDaily();
@@ -135,13 +168,13 @@ export class CaptureStore {
  }
  snapshot(){
   const daily=this.index.settings.generationMode==='daily';
-  const assigned=new Set(this.index.works.filter(w=>!daily||w.kind==='daily-summary').flatMap(w=>w.allPhotoIds||w.photoIds)),pending=[];
+  const assigned=new Set(this.index.works.filter(w=>!daily||isSummary(w)).flatMap(w=>w.allPhotoIds||w.photoIds)),pending=[];
   for(const photo of this.index.photos.filter(p=>!assigned.has(p.id))){
    const key=(photo.cameraId||'recamera-default')+'/'+photo.date;
    let group=pending.find(g=>g.key===key);
    if(!group){group={key,session:photo.session,date:photo.date,count:0,target:daily?null:this.index.groups.find(g=>g.key===key)?.target||this.index.settings.batchPhotoCount};pending.push(group);}group.count++;
   }
-  return {...this.index,pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
+  return {...this.index,works:this.index.works.map(w=>{if(!isSummary(w))return w;const album=this.albumIds(w),frozen=new Set(w.allPhotoIds||w.photoIds);return {...w,albumPhotoIds:album,latePhotoCount:album.filter(id=>!frozen.has(id)).length};}),schedule:scheduleState(this.index.settings,this.now()),pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
  }
  ingestUpload(deviceId,metadata,buffer){return this.enqueue(async()=>{
   const bad=message=>{const e=new Error(message);e.statusCode=400;throw e;};
@@ -160,8 +193,13 @@ export class CaptureStore {
  });}
  updateSettings(input){return this.enqueue(async()=>{
   if(this.index.settings.generationMode==='daily'){
-   if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(input?.dailyTime||'')||![6,7,8].includes(input?.panelCount)){const e=new Error('Use HH:mm and 6–8 panels');e.statusCode=400;throw e;}
-   const old=this.index;this.index=structuredClone(old);this.index.settings={...this.index.settings,dailyTime:input.dailyTime,panelCount:input.panelCount};
+   if(!['hourly','daily'].includes(this.index.settings.summaryFrequency||this.initialFrequency))throw new Error('Invalid summary frequency');
+   const fields=['dailyTime','panelCount','autoGenerateEnabled','summaryFrequency'];
+   const patch=Object.fromEntries(fields.filter(k=>Object.hasOwn(input||{},k)).map(k=>[k,input[k]]));
+   const next={...this.index.settings,...patch};
+   if(!Object.keys(patch).length||!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.dailyTime||'')||![6,7,8].includes(next.panelCount)||typeof next.autoGenerateEnabled!=='boolean'||!['daily','hourly'].includes(next.summaryFrequency)){const e=new Error('Use HH:mm, 6–8 panels and a boolean automatic-generation switch');e.statusCode=400;throw e;}
+   if(next.summaryFrequency==='hourly'&&(this.index.settings.summaryFrequency!=='hourly'||!next.hourlyAnchorAt))next.hourlyAnchorAt=this.now().toISOString();
+   const old=this.index;this.index=structuredClone(old);this.index.settings=next;
    try{await this.save();}catch(e){this.index=old;throw e;}return this.snapshot();
   }
   if(!Number.isInteger(input?.batchPhotoCount)||input.batchPhotoCount<1||input.batchPhotoCount>12){const e=new Error('Photo count must be an integer from 1 to 12');e.statusCode=400;throw e;}

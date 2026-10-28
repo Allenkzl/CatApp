@@ -17,13 +17,17 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：无。`feature/daily-cat-summary`（含`fix/camera-cloud-upload`修复）已按用户确认无冲突合并到main，待本轮推送及线上部署检查。GitHub仓库 https://github.com/Allenkzl/CatApp （公开）。
+- 活跃分支：`feature/hourly-comic-validation`，继承网站开关修复，完成小时/天切换、时段全量分批看图、层级汇总、完整相册和发布标记；用户本轮明确要求实现并上线，验证后合并推送。Jenkins构建触发正常，管理API403/浏览器需登录，尚无管理权限；最终以线上release标记验收。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
 ## 重要约定
-- 2026-10-27每日总结改造：默认同摄像头/北京时间日期一篇，次日00:10入队、目标8格（可选6–8），素材不足缩短。首启从当日起生效，暂停未完成旧批次但保留原图及已完成作品；不批量回填启用前历史，不因重启/晚到/改时刻重复绘图。今日预览仅素材计划、不调用付费模型。采样最多18张按时间分散，不能据此断言全天行为或个体身份。
-- 新版公开快照automation.workerEnabled/workerBlockedReason准确显示CAT_AUTO_GENERATE开关；部署模板仍默认false。上线顺序：备份数据→部署每日版并确认旧批次暂停→运维设true重建→真实生成验收。仅保存两套密钥不会打开worker；禁止先在旧三张版开启导致7组付费。详见docs/DAILY_SUMMARY.md。
+- 2026-10-28小时验证版：首次升级缺频率/新站默认hourly，从启用起每60分钟一篇；已保存daily选择保留。空间设置可切回daily（次日北京时间00:10）。按时段/相机唯一ID、空时段不生成，频率切换后旧频率未完成任务不自动付费执行，完成的小时结果在每日列表折叠历史中保留。
+- 新任务pipelineVersion=2，冻结时段全部已上传来源，每批最多6张看图，12路层级汇总，最终单篇英文故事与6–8格漫画；缓存按照片ID/内容/模型/版本复用，暂停/断点不重读已完成证据。相册按24张分页，迟到照片动态归档并标记未进入冻结故事，不自动重画。不得把参考图筛选数当成全量分析数。
+- Seedream Flash真实API返回面积上限4624220，旧1920×2560请求400；时段竖图改1728×2304后真实六张照片→英文故事→PNG成功。样例实际格数/编号有模型偏差，仍未人工审核，不自动反复绘图扣费。新提示明确两列和编号唯一，待用户验证。
+- 发布标记：/healthz与/api/capture release=hourly-comic-v1，页面页脚“小时全量测试版”。必须核对hourly频率、workerEnabled及nextRunAt才能开始一小时验收，推送/Webhook triggered=true不等于上线。详见docs/HOURLY_VALIDATION.md。
+- 历史2026-10-27每日抽样总结改造（已由10月28日全量版本替代）：默认同摄像头/北京时间日期一篇，次日00:10入队、目标8格（可选6–8），素材不足缩短。首启从当日起生效，暂停未完成旧批次但保留原图及已完成作品；不批量回填启用前历史，不因重启/晚到/改时刻重复绘图。今日预览仅素材计划、不调用付费模型。采样最多18张按时间分散，不能据此断言全天行为或个体身份。
+- 2026-10-28起每日模式以settings.autoGenerateEnabled为准，默认true；空间设置或POST /api/settings可立即保存布尔开关并持久化，覆盖旧CAT_AUTO_GENERATE=false，无需运维改环境或重启。已有false保留，非法类型拒绝。开关关闭不取消已发出的请求，但阻止后续阶段；重开继续每日队列。旧批次迁移暂停后才初始化worker，避免默认开启触发旧队列。快照workerSource=website_setting，关闭原因为website_setting_disabled。模板环境变量只保留旧批次兼容含义。
 - 2026-10-26起源码主线为main；后续推送及运维部署应以main的固定commit为准。已有Webhook若限定feature/device-upload-deployment，需运维调整为main；不能仅凭GitHub默认分支变更推断外部Webhook已改好。历史Release快照及其口令不因合并改变。
 - 2026-10-26用户明确授权完整运行资料上云：本地项目和.data原内容已做加密快照，33张当前站照片/10篇作品及旧站、真实凭据和完整日志均包含；加密包已上传GitHub Release并核对远端SHA256一致，解密口令已放仓库Secrets，明文配置仍忽略。恢复需运维一次导入持久化目录，Webhook源码更新不会自动覆盖数据；见docs/RUNTIME_BACKUP.md。
 - 2026-10-26推送前通过GitHub核实Allenkzl/CatApp已是PUBLIC（最初创建时为私有），本轮不改变仓库可见性；仅推送源码和排障记录，凭据/照片/完整运行日志保持忽略。
@@ -57,7 +61,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `scripts/recamera/upload_to_website.py` 直接在设备检测/拍照/上传，独立outbox、网络补传、最多100张待传；共享旧采集锁，不修改模型/GPIO。首次部署可用SSH，日常传输为HTTP/HTTPS。凭证不随重定向发送。
 - 2026-10-21现场：新设备192.168.50.94已验证root/Python3.11.6/websockets10.4，完成单张真实抓拍→局域网后台直传；用户随后反馈完整流程测试成功；正式服务器仍须重新验收。独立直传测试站 http://192.168.50.109:4180，数据 `.data/device-live`；旧4173与原两篇漫画保留。测试登录信息仅在忽略的 `.data/server-login.txt`。
 - 本轮最终验证：33项Node测试、6项Python设备测试、服务器与原本地模式桌面/移动浏览器流程均通过；未用模拟测试冒充新设备三张猫的现场生成验收。
-- Docker交付：Dockerfile使用node:22-bookworm-slim，非root1000:1000，Compose将服务器专用数据目录绑定到/app/data，默认仅本机端口且关闭付费生成；上线需显式开启。说明见docs/OPS_HANDOFF.md与docs/OPS_MESSAGE.md，Docker模板用deploy/.env.example。
+- Docker交付：Dockerfile使用node:22-bookworm-slim，非root1000:1000，Compose将服务器专用数据目录绑定到/app/data，默认仅本机端口；新版每日付费生成由网站持久化开关控制，默认开启。说明见docs/OPS_HANDOFF.md与docs/OPS_MESSAGE.md，Docker模板用deploy/.env.example。
 - 本机无Docker Engine/CLI，本轮只交付构建/运行文件和隔离容器验证脚本，未声称已构建镜像或验证容器；公网、设备守护及正式验收由运维部署阶段执行。交付说明见README与docs/DEVICE_UPLOAD.md。`.env.example` 仅含占位值，可提交；所有真实凭证、运行照片、登录信息仍在忽略目录。
 
 ## 变更日志
@@ -87,3 +91,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-27 | feature/daily-cat-summary | 完成北京时间次日00:10每日唯一调度、时间采样、6–8格英文竖版、无付费素材预览与设置、旧批次暂停和worker关闭提示；44项Node测试、隔离每日浏览器及服务器回归验证通过。未合并/推送、未改线上环境、未调用真实模型生成新成品，待正式部署验收。 |
 
 | 2026-10-27 | main | 按用户确认no-ff合并feature/daily-cat-summary（包含相机压缩直传修复），无冲突；清理两个已合并的本地分支，准备推送触发部署。自动生成仍须核对运行环境CAT_AUTO_GENERATE=true，不能把源码推送当成开关已启用或真实成品已生成。 |
+
+| 2026-10-28 | fix/web-auto-generation-switch | 每日worker改读网站持久化布尔开关，默认开启且覆盖旧环境false，设置页可暂停/恢复并重启保留；49项后端测试及每日中英手机浏览器验证通过，测试覆盖在途请求完成后暂停绘图、重开不重复故事及旧队列不唤醒。尚未合并推送/部署；全量读图与昨天补生成仍是后续任务。 |
+
+| 2026-10-28 | feature/hourly-comic-validation | 完成小时验证/每日切换、完整时段分批读图及缓存层级汇总、相册分页与迟到标记、英文排版规范化和Flash尺寸修复；56项后端测试、小时/每日/服务器浏览器验证通过，另用6张云端真照和真实DeepSeek/Seedream完成隔离生成；样例有格数编号偏差，保留未审核。用户授权上线，待合并发布及站点标记验收。 |
