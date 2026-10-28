@@ -9,7 +9,7 @@ async function start(){ child=spawn(process.execPath,['scripts/serve.mjs'],{env:
 }
 async function stop(){if(!child)return;const current=child;child=null;if(current.exitCode!==null||current.signalCode)return;const ended=once(current,'exit');current.kill('SIGTERM');const timeout=setTimeout(()=>current.kill('SIGKILL'),5000);try{await ended;}finally{clearTimeout(timeout);}}
 try{
- const store=await new CaptureStore({inputRoot:null,dataDir:data,now:()=>new Date(day+'T00:00:00+08:00')}).init();
+ const store=await new CaptureStore({initialFrequency:'daily',inputRoot:null,dataDir:data,now:()=>new Date(day+'T00:00:00+08:00')}).init();
  for(let i=0;i<8;i++)await store.ingestUpload('camera-demo',{photoId:'sample-'+i,capturedAt:day+'T'+String(i*3).padStart(2,'0')+':00:00+08:00'},Buffer.concat([jpeg.subarray(0,2),Buffer.from([255,254,0,4,0,i]),jpeg.subarray(2)]));
  store.index.works.push({id:'e'.repeat(24),date:day,status:'legacy_paused',photoIds:[store.index.photos[0].id],title:'Old batch'});await store.save();
  await start();
