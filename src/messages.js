@@ -1,5 +1,12 @@
 // Canonical Chinese copy and its English presentation. Business values stay unchanged.
 export const messages = Object.fromEntries(`
+按小时测试或按天归档，自动整理一篇英文故事，需要时再点击绘图。|Automatically prepare one English story per hour or day; request an illustration when needed.
+一天的素材归档后，次日整理成英文故事，漫画由你点击生成。|The day's photos become an English story the next day. Click to generate an illustration.
+DeepSeek 自动编写英文故事；点击按钮才由 Seedream 绘图。|DeepSeek writes stories automatically. Seedream draws only when you request it.
+作品保存在网站后端。DeepSeek 自动编写英文故事；每篇故事可选择付费生成手绘漫画。|Stories are saved on the website backend. Each story has an optional paid illustration.
+英文故事自动整理，漫画按需生成|Automatic stories; illustrations on request
+每60分钟一篇测试漫画|One test story every 60 minutes
+
 按小时测试或按天归档，生成一篇英文总结漫画。|Create an English diary from hourly tests or daily archives.
 从早到晚，|From morning to night,
 收好一天的猫咪故事。|keep a diary of the cat’s day.
@@ -54,9 +61,9 @@ Open Datalogger · 阳台猫应用包|Open Datalogger · Balcony Cat App
 原始照片，保留拍摄时间|Original photos with capture times
 等待组图|Awaiting a group
 同批次同一天，三张一组|Three photos per batch and day
-当天每日漫画|Today's photo stories
+当天每日故事|Today's daily stories
 照片与创作文案自动排版|Photos and creative captions, arranged automatically
-全部每日漫画|All photo stories
+全部每日故事|All daily stories
 已保存到本机作品库|Saved in the local collection
 等一等，下一个小瞬间|Waiting for the next little moment
 采集程序下载照片并更新清单后，这里会自动出现。|Photos appear here once the collector downloads them and updates the manifest.
@@ -196,10 +203,10 @@ reCamera 抓拍|reCamera snapshots
 · 创作|· Creative writing
 这一格的依据|Sources for this panel
 调整任意内容后，需重新勾选事实审核。|Reapprove the facts after making changes.
-每日漫画，把日常收进来|Little days, collected in stories
+每日故事，把日常收进来|Daily stories, collected moments
 每三张抓拍，自动成为一篇可以收藏的图文故事。|Every three snapshots become a photo story to keep.
 查看抓拍|Browse photos
-第一篇每日漫画，还在路上|Your first photo story is on its way
+第一篇每日故事，还在路上|Your first daily story is on its way
 同一采集批次、同一天收齐三张照片后，会自动排版并保存在这里。|Three photos from the same batch and day are automatically arranged and saved here.
 查看收集进度|View collection progress
 查看保存内容|View saved work

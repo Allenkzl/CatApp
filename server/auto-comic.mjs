@@ -17,26 +17,26 @@ export class AutoComic {
   try{const value=JSON.parse(await readFile(path.join(this.store.dataDir,'secrets.json'),'utf8'));this.key ||= value.deepseekKey||'';}catch(e){if(e.code!=='ENOENT')throw new Error('Unable to read local API credentials');}
   // A request interrupted by a restart is not blindly resubmitted (it may be billed).
   await this.drawing.init();
-  for(const w of this.store.index.works)if(['analyzing','summarizing','generating','drawing'].includes(w.status))await this.store.updateJob(w.id,{status:w.status==='drawing'?'image_failed':'failed',error:'Service restarted during generation. Retry manually.',retryAt:null});
+  for(const w of this.store.index.works)if(['analyzing','summarizing','generating','drawing'].includes(w.status))await this.store.updateJob(w.id,{status:w.status==='drawing'?'image_failed':'failed',error:'Service restarted during generation. Retry manually.',drawingRequested:false,retryAt:null});
   return this;
  }
  enabled(){return this.store.index.settings.generationMode==='daily'?this.store.index.settings.autoGenerateEnabled===true:process.env.CAT_AUTO_GENERATE!=='false';}
- snapshot(){const daily=this.store.index.settings.generationMode==='daily';return {workerEnabled:this.enabled(),workerSource:daily?'website_setting':'environment',workerRunning:!!this.running,workerBlockedReason:this.enabled()?null:daily?'website_setting_disabled':'CAT_AUTO_GENERATE=false',deepseekConfigured:!!this.key,storyModel:'deepseek-flash',...this.drawing.snapshot()};}
+ snapshot(){const daily=this.store.index.settings.generationMode==='daily';return {workerEnabled:this.enabled(),workerSource:daily?'website_setting':'environment',workerRunning:!!this.running,drawingMode:'manual',workerBlockedReason:this.enabled()?null:daily?'website_setting_disabled':'CAT_AUTO_GENERATE=false',deepseekConfigured:!!this.key,storyModel:'deepseek-flash',...this.drawing.snapshot()};}
  async configure(input){
   if(typeof input?.deepseekKey!=='string'||!/^sk-[A-Za-z0-9_-]{10,200}$/.test(input.deepseekKey)){const e=new Error('Invalid API key');e.statusCode=400;throw e;}
   const file=path.join(this.store.dataDir,'secrets.json');await writeFile(file+'.tmp',JSON.stringify({deepseekKey:input.deepseekKey}),{mode:0o600});await chmod(file+'.tmp',0o600);await rename(file+'.tmp',file);this.key=input.deepseekKey;return this.snapshot();
  }
- tick(){if(!this.enabled())return this.running||Promise.resolve();if(this.running)return this.running;this.running=this.run().finally(()=>this.running=null);return this.running;}
+ tick(){if(!this.enabled()&&!this.store.index.works.some(w=>w.status==='image_queued'&&w.drawingRequested))return this.running||Promise.resolve();if(this.running)return this.running;this.running=this.run().finally(()=>this.running=null);return this.running;}
  async draw(work){
-  await this.store.updateJob(work.id,{status:'drawing',error:null,generationStage:'image'});
+  await this.store.updateJob(work.id,{status:'drawing',error:null,generationStage:'image',drawingRequested:false,drawingAttempts:(work.drawingAttempts||0)+1});
   try{const result=await this.drawing.generate(work);await this.store.publish(work.id,result);}
-  catch(e){const message=e.message.startsWith('Seedream request failed')?e.message:e.name==='TimeoutError'?'Seedream timed out. Retry manually to avoid duplicate billing.':'Image generation did not complete. Check drawing configuration or recover the saved output.';await this.store.updateJob(work.id,{status:'image_failed',error:message});}
+  catch(e){const message=e.message.startsWith('Seedream request failed')?e.message:e.name==='TimeoutError'?'Seedream timed out after 10 minutes. Story is saved; confirm provider billing before retrying.':'Image generation did not complete. Check drawing configuration or recover the saved output.';await this.store.updateJob(work.id,{status:'image_failed',drawingRequested:false,error:message});}
  }
  async runSummary(work){
   const attempt=(work.attempts||0)+1;
   try{
    const result=await this.pipeline.step(work,this.key);
-   if(result.done)await this.store.updateJob(work.id,{status:'awaiting_image_provider',generationStage:'image',story:result.story,title:result.story.title,storyModel:'deepseek-flash',analyzedCount:(work.allPhotoIds||work.photoIds).length,analysisTotal:(work.allPhotoIds||work.photoIds).length,attempts:0,error:null,retryAt:null});
+   if(result.done)await this.store.updateJob(work.id,{status:'story_ready',generationStage:'story_complete',story:result.story,title:result.story.title,storyModel:'deepseek-flash',analyzedCount:(work.allPhotoIds||work.photoIds).length,analysisTotal:(work.allPhotoIds||work.photoIds).length,attempts:0,error:null,retryAt:null});
    else await this.store.updateJob(work.id,{...result.patch,status:'ready_for_generation',attempts:0,error:null,retryAt:null});
   }catch(e){
    const retry=!!e.retryable&&attempt<3,message=e.message.startsWith('DeepSeek request failed')?e.message:e.name==='TimeoutError'?'Analysis request timed out. Retry manually; completed evidence is retained.':'Photo analysis or summary failed. Check sources and model configuration; completed evidence is retained.';
@@ -44,7 +44,8 @@ export class AutoComic {
   }
  }
  async run(){
-  if(this.drawing.config.apiKey){const next=this.store.index.works.find(w=>this.store.workEligible(w)&&w.status==='awaiting_image_provider'&&w.story);if(next)return this.draw(next);}
+  if(this.drawing.config.apiKey){const next=this.store.index.works.find(w=>w.status==='image_queued'&&w.drawingRequested===true&&w.story);if(next)return this.draw(next);}
+  if(!this.enabled())return;
   if(!this.key)return;
   const work=this.store.index.works.find(w=>this.store.workEligible(w)&&(w.status==='ready_for_generation'||(w.status==='retry_wait'&&Date.parse(w.retryAt)<=Date.now())));
   if(!work)return;
@@ -59,7 +60,7 @@ export class AutoComic {
    const response=await this.fetch('https://api.deepseek.com/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+this.key,'Content-Type':'application/json'},body:JSON.stringify({model:'deepseek-flash',messages:[{role:'user',content}],response_format:{type:'json_object'},max_tokens:5000,stream:false}),signal:AbortSignal.timeout(120000),redirect:'error'});
    if(!response.ok){const e=new Error(`DeepSeek request failed (HTTP ${response.status})`);e.retryable=response.status===429||response.status>=500;throw e;}
    const result=await response.json(),story=validateStory(JSON.parse(result.choices?.[0]?.message?.content),work);
-   await this.store.updateJob(work.id,{status:'awaiting_image_provider',story,title:work.artwork?work.title:story.title,storyModel:'deepseek-flash',error:null});
+   await this.store.updateJob(work.id,{status:'story_ready',generationStage:'story_complete',story,title:work.artwork?work.title:story.title,storyModel:'deepseek-flash',error:null});
   }catch(e){
    const retry=!!e.retryable&&attempt<3;
    // Never persist raw provider responses, request headers, or exceptions containing secrets.
