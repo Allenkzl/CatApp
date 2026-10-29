@@ -1,5 +1,8 @@
+import {safeRequestId,publicationFailure} from './drawing-diagnostics.mjs';
+import {validatePublication} from './comic-publication.mjs';
 import {isSummary} from './daily-summary.mjs';
-import {readFile,writeFile,rename,mkdir,chmod,stat} from 'node:fs/promises';
+import {constants} from 'node:fs';
+import {access,readFile,writeFile,rename,mkdir,chmod,stat} from 'node:fs/promises';
 import path from 'node:path';
 export const SEEDREAM_MODEL='doubao-seedream-5-0-pro-260628';
 export function comicPrompt(work){
@@ -15,7 +18,18 @@ export class Seedream {
   const next={apiKey:input.apiKey||this.config.apiKey,model:input.model||SEEDREAM_MODEL},file=path.join(this.store.dataDir,'seedream-config.json');
   await writeFile(file+'.tmp',JSON.stringify(next),{mode:0o600});await chmod(file+'.tmp',0o600);await rename(file+'.tmp',file);this.config=next;return this.snapshot();
  }
- async generate(work){
+ async inspect(work){
+  const fileState=async file=>{try{const s=await stat(file);await access(file,constants.R_OK);return {exists:true,bytes:s.size};}catch(e){return {exists:false,error:['ENOENT','EACCES','EPERM'].includes(e.code)?e.code:'UNREADABLE'};}};
+  const refs=[...new Set((work.story?.panels||[]).map(p=>p.photoId))];
+  const style=await fileState(new URL('public/comic-style-reference-en.png',this.root));
+  const sources=await Promise.all(refs.map(async id=>({id,...await fileState(await this.store.photoFile(id)||path.join(this.store.dataDir,'media','missing-source'))})));
+  const dir=path.join(this.store.dataDir,'jobs',work.id),image=await fileState(path.join(dir,'seedream-result.png')),metadata=await fileState(path.join(dir,'seedream-publication.json'));
+  const cache={image,metadata,publicationValid:null,matchesCurrentRequest:null,validationError:null};
+  if(image.exists&&metadata.exists){try{const m=JSON.parse(await readFile(path.join(dir,'seedream-publication.json'),'utf8'));const sourceMap=refs.map((id,i)=>`Input image ${i+2} = photoId ${id}.`).join(' ');cache.matchesCurrentRequest=m.prompt===comicPrompt(work)+' '+sourceMap&&m.model===this.config.model&&JSON.stringify(m.photoIds)===JSON.stringify(work.photoIds);if(image.bytes<=24*1024*1024){validatePublication(work,{metadata:m,imageBase64:(await readFile(path.join(dir,'seedream-result.png'))).toString('base64')});cache.publicationValid=true;}else {cache.publicationValid=false;cache.validationError='PNG exceeds 24 MB publication limit';}}catch(e){cache.publicationValid=false;cache.validationError=publicationFailure(e)||(e.name==='SyntaxError'?'Saved metadata is not valid JSON':'Saved output is unreadable');}}
+  return {style,sources,cache,providerConfigured:!!this.config.apiKey,model:this.config.model,timeoutSeconds:600};
+ }
+ async generate(work,{onProgress=async()=>{}}={}){
+  await onProgress('preparing_sources');
   if(!this.config.apiKey)throw new Error('Seedream is not configured');
   const prompt=comicPrompt(work),ids=[...new Set(work.story.panels.map(p=>p.photoId))];
   const images=['data:image/png;base64,'+(await readFile(new URL('public/comic-style-reference-en.png',this.root))).toString('base64')];
@@ -23,13 +37,19 @@ export class Seedream {
   const sourceMap=ids.map((id,i)=>`Input image ${i+2} = photoId ${id}.`).join(' ');
   const payload={model:this.config.model,prompt:prompt+' '+sourceMap,image:images,size:isSummary(work)?'1728x2304':'2560x1440',response_format:'b64_json',output_format:'png',stream:false,watermark:false};
   const dir=path.join(this.store.dataDir,'jobs',work.id);
-  try{const metadata=JSON.parse(await readFile(path.join(dir,'seedream-publication.json'),'utf8'));if(metadata.prompt===payload.prompt&&metadata.model===this.config.model&&JSON.stringify(metadata.photoIds)===JSON.stringify(work.photoIds))return {imageBase64:(await readFile(path.join(dir,'seedream-result.png'))).toString('base64'),metadata};}catch(e){if(e.code!=='ENOENT')throw new Error('Saved drawing output needs inspection before retry');try{await stat(path.join(dir,'seedream-result.png'));throw new Error('Saved drawing output needs inspection before retry');}catch(saved){if(saved.code!=='ENOENT')throw saved;}}
-  const response=await this.fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations',{method:'POST',headers:{Authorization:'Bearer '+this.config.apiKey,'Content-Type':'application/json'},body:JSON.stringify(payload),signal:this.timeoutFactory(600000),redirect:'error'});
+  await onProgress('checking_cache',{sourceCount:ids.length,model:this.config.model});
+  try{const metadata=JSON.parse(await readFile(path.join(dir,'seedream-publication.json'),'utf8'));if(metadata.prompt===payload.prompt&&metadata.model===this.config.model&&JSON.stringify(metadata.photoIds)===JSON.stringify(work.photoIds)){await onProgress('loading_cached_image',{cacheReused:true});return {imageBase64:(await readFile(path.join(dir,'seedream-result.png'))).toString('base64'),metadata};}throw new Error('Saved drawing output does not match current request');}catch(e){if(e.code!=='ENOENT')throw new Error('Saved drawing output needs inspection before retry',{cause:e});try{await stat(path.join(dir,'seedream-result.png'));throw new Error('Saved drawing output needs inspection before retry');}catch(saved){if(saved.code!=='ENOENT')throw saved;}}
+  const requestBody=JSON.stringify(payload);
+  await onProgress('provider_request',{requestBytes:Buffer.byteLength(requestBody)});
+  const response=await this.fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations',{method:'POST',headers:{Authorization:'Bearer '+this.config.apiKey,'Content-Type':'application/json'},body:requestBody,signal:this.timeoutFactory(600000),redirect:'error'});
+  await onProgress('provider_response',{httpStatus:response.status||200,requestId:safeRequestId((response.headers?.get('x-request-id')||response.headers?.get('x-tt-logid')))});
   if(!response.ok){let code='';try{const r=await response.json();if(/^[A-Za-z0-9_.-]{1,100}$/.test(r.error?.code||''))code=r.error.code;}catch{}const e=new Error(`Seedream request failed (HTTP ${response.status}${code?', '+code:''})`);throw e;}
   const result=await response.json(),data=result.data?.[0];
-  if(!data?.b64_json)throw new Error('Seedream did not return PNG image data');
+  await onProgress('decoding_response',{requestId:safeRequestId(result.request_id||result.id||(response.headers?.get('x-request-id')||response.headers?.get('x-tt-logid'))),imageReturned:!!data?.b64_json});
+  if(!data?.b64_json){const e=new Error('Seedream did not return PNG image data');e.code='SEEDREAM_NO_IMAGE';throw e;}
   const metadata={...work.story,prompt:payload.prompt,reviewed:false,generationMode:'seedream-api',model:this.config.model,qualityStatus:'unreviewed'};
   // Retain the paid output before publication, so a save error never forces a new API call.
+  await onProgress('saving_image',{imageBytes:Buffer.from(data.b64_json,'base64').length});
   await mkdir(dir,{recursive:true});
   await writeFile(path.join(dir,'seedream-result.png'),Buffer.from(data.b64_json,'base64'));
   await writeFile(path.join(dir,'seedream-publication.json'),JSON.stringify(metadata,null,2));
