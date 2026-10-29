@@ -23,3 +23,7 @@ Seedream专用传输改为Node原生HTTP(S)请求，不新增运行依赖。实�
 ## 本轮验证结果
 
 71项后端测试通过，手动绘图/只读诊断及服务器浏览器回归通过；310秒慢响应完整模拟成功保存PNG并发布作品，全程一次请求，无自动重试。原生HTTPS对官方Ark进行无密钥HEAD检查，完成TLS并返回401（仅连通性检查，未调用模型）。本轮没有真实付费绘图调用。
+
+## 正式站核验
+
+2026-10-29 main发布ced8b10已推送，GitHub交付Jenkins HTTP200；正式站health返回drawingTransportVersion=1，automation和只读诊断均为node-https/600秒。频率仍daily、绘图manual、worker空闲；此前失败作品保留、drawingAttempts仍2。本轮未新增真实付费绘图，交由用户点击网站重测。此验收记录本地提交，不为文档再次触发部署。
