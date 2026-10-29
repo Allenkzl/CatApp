@@ -7,6 +7,7 @@ import {AutoComic} from '../server/auto-comic.mjs';
 import {CaptureStore} from '../server/capture-store.mjs';
 import {runtimeConfig} from '../server/runtime-config.mjs';
 import {Access} from '../server/access.mjs';
+import {ArkNetworkCheck} from '../server/ark-network-check.mjs';
 import {loginPage} from '../server/login-page.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),config=runtimeConfig(root);
 const store=await new CaptureStore({inputRoot:config.inputRoot,dataDir:config.dataDir}).init();
@@ -16,11 +17,12 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 const json=(res,code,value)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
 async function bytes(req,limit){const size=Number(req.headers['content-length']);if(size>limit){const e=new Error('Request too large');e.statusCode=413;throw e;}const chunks=[];let count=0;for await(const c of req){count+=c.length;if(count>limit){const e=new Error('Request too large');e.statusCode=413;throw e;}chunks.push(c);}return Buffer.concat(chunks);}
 async function body(req){try{return JSON.parse((await bytes(req,34*1024*1024)).toString('utf8'));}catch(e){if(e.statusCode)throw e;const error=new Error('Invalid JSON');error.statusCode=400;throw error;}}
+const arkNetworkCheck=new ArkNetworkCheck(()=>auto.drawing.config);
 const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
  try{
   const requestURL=new URL(req.url,'http://localhost'),pathname=decodeURIComponent(requestURL.pathname);
-  if(pathname==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok',release:'story-manual-drawing-v1',summaryPipelineVersion:2,drawingDiagnosticsVersion:1,drawingTransportVersion:1});
+  if(pathname==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok',release:'story-manual-drawing-v1',summaryPipelineVersion:2,drawingDiagnosticsVersion:1,drawingTransportVersion:1,arkNetworkCheckVersion:1});
   const host=new URL('http://'+(req.headers.host||'')).host;
   if(config.server?host!==new URL(config.origin).host:!['localhost','127.0.0.1'].includes(new URL('http://'+host).hostname))return json(res,403,{error:'Host not allowed'});
   const expected=config.origin||'http://'+host;
@@ -53,6 +55,7 @@ const server=http.createServer(async(req,res)=>{
     if(pathname==='/api/daily/preview'){const input=await body(req);return json(res,200,store.previewDay(input.date,input.cameraId));}
     if(pathname==='/api/settings')return json(res,200,await store.updateSettings(await body(req)));
     if(pathname==='/api/collector'){if(config.server)return json(res,409,{error:'SSH collection is disabled in server mode'});return json(res,200,await collector.configure(await body(req)));}
+    if(pathname==='/api/drawing/network-check'){const input=await body(req);if(!input||Array.isArray(input)||typeof input!=='object'||Object.keys(input).length)return json(res,400,{error:'Network check accepts no URL or request options'});return json(res,200,await arkNetworkCheck.run());}
     if(pathname==='/api/drawing-config')return json(res,200,await auto.drawing.configure(await body(req)));
     if(pathname==='/api/credentials')return json(res,200,await auto.configure(await body(req)));
     if(pathname==='/api/capture/sync')return json(res,200,await store.sync());

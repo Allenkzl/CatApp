@@ -17,11 +17,12 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：无。长等待修复ced8b10已上线；最新云端请求600343ms后APPLICATION_TIMEOUT。2026-10-29经用户允许一次本机付费对照：同故事/8参考图/模型/12391519字节请求，在本机35377ms成功生成1728×2304 PNG并通过发布校验，仅存忽略的.data/local-cloud-comparison-1793243656724，未回填云端。重点待排查云端出站请求链路，不能凭一次对照断言具体网络故障。
+- 活跃分支：`fix/cloud-ark-connectivity`，补充实际云容器内固定方舟主机DNS/TCP/TLS/鉴权/IPv4对照与代理配置布尔检查，只做GET/HEAD，不付费绘图；补充未来手动请求写出进度日志。按用户此前验证后合并推送授权推进，部署后读取真实云端报告。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
 ## 重要约定
+- 2026-10-29方舟网络自检：POST /api/drawing/network-check只接受空对象，固定官方主机GET模型目录/HEAD路由，默认与IPv4对照、可选IPv6，不生成图片。请求同进程合并且60秒缓存；代理仅布尔标记，密钥/地址/原始响应不返回。health arkNetworkCheckVersion=1，详见docs/ARK_NETWORK_CHECK.md。未来手动绘图失败的transport字段记录TCP/TLS/客户端写出是否完成，不能把写出等同于服务商接收成功。
 - 2026-10-29传输修复：Seedream生产默认走server/drawing-http.mjs原生HTTPS，显式600秒AbortSignal覆盖上传/等响应头/读响应体，不用fetch/Undici默认300秒响应头限制；DeepSeek保持原fetch。无自动重试、不跟随重定向、默认TLS校验、响应上限40MiB。健康接口drawingTransportVersion=1及automation.drawingTransport=node-https用于上线核验。
 - 2026-10-29绘图诊断：drawingDiagnostics记录阶段/耗时/HTTP状态/请求ID/允许列表错误码，失败同步写容器stderr；GET作品drawing-diagnostics只读检查来源及付费输出缓存。旧失败未保存原始错误不能补造原因；Node内置Undici默认300秒是待验证线索，不能直接认定为实际故障。诊断不触发付费请求，原始错误/堆栈/响应体/凭据不记录。健康标识drawingDiagnosticsVersion=1，详见docs/DRAWING_DIAGNOSTICS.md。
 - 2026-10-29手动绘图版：自动管线只到story_ready，故事正常入库可读；Seedream仅消费网站按钮付费确认后的image_queued/drawingRequested任务。自动开关控制DeepSeek读图/故事，仍有文字/视觉API费用；明确确认的绘图独立执行。旧等待故事升级就绪，旧失败和成品保留，不自动重画。浏览器请求ID持久化防重，失败重试需再次确认可能已计费。超时600秒，保留所有缓存；新站默认daily，已有hourly/daily选择保留。上线标识story-manual-drawing-v1，详见docs/MANUAL_DRAWING.md。
@@ -122,3 +123,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-29 | main | ced8b10已推送，Jenkins Webhook200，正式站health与automation及只读诊断均确认原生HTTPS/600秒修复上线；绘图仍manual、每日故事daily、worker空闲，原作品drawingAttempts仍2，未新增付费请求。部署核验记录本地提交，避免仅文档推送再次触发重建干扰用户重测。 |
 
 | 2026-10-29 | main | 按用户明确许可本机一次真实绘图对照：GET models鉴权200约517ms，相同8图/故事/模型和约12.4MB请求35377ms完成，PNG8394935字节、1728×2304，8格英文已查看。对比云端600343ms无响应头；结果仅本机隔离保存，未修改云端作品、未自动再试。 |
+
+| 2026-10-29 | fix/cloud-ark-connectivity | 新增固定方舟主机的云容器DNS/TCP/TLS/鉴权/IPv4对照自检及代理配置布尔信息，GET/HEAD不绘图、并发共享/60秒缓存、任意URL拒绝；未来手动请求失败保留写出进度。75项测试及自检/手动绘图浏览器验证通过，准备按既有授权合并推送后实测。 |
