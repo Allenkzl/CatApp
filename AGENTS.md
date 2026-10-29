@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`fix/seedream-failure-diagnostics`，补充绘图阶段/耗时/底层错误码和只读缓存诊断。旧失败未保留底层异常，不能确认具体原因或计费状态；已验证8张参考图及风格图可读、故事元数据校验通过，待合并部署读取云端缓存。
+- 活跃分支：无。fix/seedream-failure-diagnostics已按用户确认无冲突合并main（功能c7541e2），准备推送并核对drawingDiagnosticsVersion=1，然后只读检查云端付费输出缓存；本轮不触发真实绘图。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
@@ -109,3 +109,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-29 | main | 按用户确认no-ff合并feature/manual-comic-generation，无冲突；每日自动故事、手动付费绘图及600秒超时进入main，清理已合并本地分支。尚未推送或部署，线上以story-manual-drawing-v1验收。 |
 
 | 2026-10-29 | fix/seedream-failure-diagnostics | 新增分阶段绘图诊断、脱敏底层错误码/服务商请求ID、只读来源和PNG缓存检查；63项后端测试及只读诊断/手动绘图浏览器流程通过，未调用真实付费模型。历史失败仍需线上缓存/服务商记录确认，不将推测当成具体原因；待用户确认合并及推送。 |
+
+| 2026-10-29 | main | 用户确认no-ff合并fix/seedream-failure-diagnostics并推送，无冲突；部署后以drawingDiagnosticsVersion=1核验并只读检查失败作品缓存，不自动付费重试。 |
