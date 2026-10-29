@@ -37,7 +37,7 @@ function localDate(iso){
  return {date:parts.slice(0,10),time:parts.slice(11,19),capturedAt:time.toISOString()};
 }
 export class CaptureStore {
- constructor({inputRoot,dataDir,now=()=>new Date(),generationMode='daily',initialFrequency='hourly'}){this.now=now;this.generationMode=generationMode;this.initialFrequency=initialFrequency;this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
+ constructor({inputRoot,dataDir,now=()=>new Date(),generationMode='daily',initialFrequency='daily'}){this.now=now;this.generationMode=generationMode;this.initialFrequency=initialFrequency;this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
  async init(){
   await mkdir(path.join(this.dataDir,'media'),{recursive:true});
   await mkdir(path.join(this.dataDir,'comics'),{recursive:true});
@@ -59,6 +59,7 @@ export class CaptureStore {
    if(typeof this.index.settings.autoGenerateEnabled!=='boolean')throw new Error('Invalid saved automatic-generation setting');
   }
   for(const work of this.index.works)if(work.mode==='photo-layout'&&work.status!=='legacy_paused'){work.previewUrl=work.comicUrl;work.comicUrl=null;work.mode='illustrated-comic';work.status='ready_for_generation';migrated=true;}
+  for(const work of this.index.works)if(work.status==='awaiting_image_provider'&&work.story){work.status='story_ready';work.generationStage='story_complete';work.drawingRequested=false;migrated=true;}
   if(migrated)await this.save();
   await this.sync();return this;
  }
@@ -217,6 +218,21 @@ export class CaptureStore {
   const art=[work?.artwork,...(work?.history||[])].find(a=>a?.digest===digest);
   return art?path.join(this.dataDir,'comics',id+'-'+digest+'.png'):null;
  }
+ requestDrawing(id,input){return this.enqueue(async()=>{
+  const fail=(message,statusCode=409)=>{const e=new Error(message);e.statusCode=statusCode;throw e;};
+  if(input?.confirmPaid!==true)fail('Confirm that this manual drawing may incur provider charges',400);
+  const work=this.index.works.find(w=>w.id===id);if(!work)fail('Unknown work',404);
+  if(work.status==='legacy_paused')fail('Legacy batch is paused');
+  if(input.requestId!==undefined&&(typeof input.requestId!=='string'||!/^[A-Za-z0-9_-]{8,100}$/.test(input.requestId)))fail('Invalid drawing request ID',400);
+  if(input.requestId&&(work.drawingRequestId===input.requestId||work.drawingRequestIds?.includes(input.requestId)))return {workId:id,status:work.status,duplicate:true};
+  if(!work.story||!Array.isArray(work.story.panels)||!work.story.panels.length)fail('Finish the story before drawing');
+  if(work.artwork||['image_queued','drawing'].includes(work.status))return {workId:id,status:work.status,duplicate:true};
+  if(!['story_ready','awaiting_image_provider','image_failed'].includes(work.status))fail('Work is not ready for manual drawing');
+  if(work.status==='image_failed'&&input.confirmRetry!==true)fail('Previous drawing may have been billed; explicitly confirm retry');
+  const old=this.index;this.index={...old,works:old.works.map(w=>w.id===id?{...w,status:'image_queued',generationStage:'image',drawingRequested:true,drawingRequestId:input.requestId||null,drawingRequestIds:[...(work.drawingRequestIds||[work.drawingRequestId].filter(Boolean)),...(input.requestId?[input.requestId]:[])],drawingRequestedAt:new Date().toISOString(),error:null}:w)};
+  try{await this.save();}catch(e){this.index=old;throw e;}
+  return {workId:id,status:'image_queued',duplicate:false};
+ });}
  setGeneration(id,input){return this.enqueue(async()=>{
   const work=this.index.works.find(w=>w.id===id);
   if(!work){const error=new Error('Unknown capture batch');error.statusCode=404;throw error;}
