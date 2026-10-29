@@ -1,3 +1,5 @@
+> 后续传输修复和310秒完整模拟验证见 [SEEDREAM_HTTP_TIMEOUT.md](SEEDREAM_HTTP_TIMEOUT.md)。本文保留原始排障证据。
+
 # 绘图失败诊断（不调用模型）
 
 分支 fix/seedream-failure-diagnostics。用户确认新增分支补充诊断；不自动绘图重试，不修改模型或费用策略。

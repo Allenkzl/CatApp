@@ -13,7 +13,7 @@ export function validateStory(value,work){
  return {title:value.title,summary:value.summary,panels:value.panels,photoIds:[...work.photoIds],language:'en',storyIsFiction:true,continuousEventVerified:false};
 }
 export class AutoComic {
- constructor(store,{fetchImpl=fetch}={}){this.store=store;this.fetch=fetchImpl;this.drawing=new Seedream(store,{fetchImpl});this.key=process.env.DEEPSEEK_API_KEY||'';this.running=null;this.pipeline=new SummaryPipeline(store,{fetchImpl,validateStory});}
+ constructor(store,{fetchImpl,drawingFetchImpl}={}){this.store=store;this.fetch=fetchImpl??fetch;this.drawing=new Seedream(store,{fetchImpl:drawingFetchImpl??fetchImpl});this.key=process.env.DEEPSEEK_API_KEY||'';this.running=null;this.pipeline=new SummaryPipeline(store,{fetchImpl:this.fetch,validateStory});}
  async init(){
   try{const value=JSON.parse(await readFile(path.join(this.store.dataDir,'secrets.json'),'utf8'));this.key ||= value.deepseekKey||'';}catch(e){if(e.code!=='ENOENT')throw new Error('Unable to read local API credentials');}
   // A request interrupted by a restart is not blindly resubmitted (it may be billed).
