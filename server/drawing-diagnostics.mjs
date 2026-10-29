@@ -16,7 +16,8 @@ export function drawingFailure(error,stage){
  else if(stage==='publishing'&&publicationFailure(error))message='Publication validation failed: '+publicationFailure(error);
  else if(stage==='publishing')message='The drawing reached publication but could not be published. Inspect the saved image and metadata; do not request another paid image yet.';
  else message=`Drawing failed at ${stage}. Check the read-only drawing diagnostics before retrying.`;
- return {stage,code:code||(error?.name==='TimeoutError'?'APPLICATION_TIMEOUT':null),...(http?{httpStatus:Number(http[1]),providerCode:http[2]||null}:{}),message};
+ const transport={};const source=error?.drawingTransport;for(const k of ['requestBytes','dnsMs','tcpMs','tlsMs','uploadFinishedMs','responseHeadersMs','bytesWritten','bufferedBytes'])if(Number.isFinite(source?.[k])&&source[k]>=0)transport[k]=source[k];for(const k of ['uploadComplete','tlsAuthorized'])if(typeof source?.[k]==='boolean')transport[k]=source[k];if(['IPv4','IPv6'].includes(source?.remoteFamily))transport.remoteFamily=source.remoteFamily;
+ return {stage,...(Object.keys(transport).length?{transport}:{}),code:code||(error?.name==='TimeoutError'?'APPLICATION_TIMEOUT':null),...(http?{httpStatus:Number(http[1]),providerCode:http[2]||null}:{}),message};
 }
 
 export function publicationFailure(error){const message=error?.message||'';return /^(English, reviewed, fictional-story metadata is required|Source photos must exactly match this batch, in order|Panel count exceeds this work target|Panel source photo does not match its position|(?:Title|Summary|Caption|Dialogue|Observation|Uncertainty|Generation prompt|Model) must be nonempty English text|PNG image data is required \(maximum 24 MB\)|A complete PNG is required|PNG dimensions are unsupported)$/.test(message)?message:null;}
