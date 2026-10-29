@@ -17,11 +17,12 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：无。绘图诊断版7006287已上线。用户允许一次真实绘图复现，确认303145ms后UND_ERR_HEADERS_TIMEOUT，阶段provider_request；外层600秒没有覆盖底层约300秒响应头超时。8/8来源和风格图正常，无PNG缓存；未再重试。根因已定位，实际HTTP传输超时修复待后续确认分支。
+- 活跃分支：`fix/seedream-http-timeout`，将Seedream专用请求从fetch改为原生HTTP(S)，10分钟总截止覆盖响应头和响应体，保留手动确认/防重/缓存/诊断。用户已授权验证通过后直接合并main并推送，真实付费绘图留给用户在网站测试。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
 ## 重要约定
+- 2026-10-29传输修复：Seedream生产默认走server/drawing-http.mjs原生HTTPS，显式600秒AbortSignal覆盖上传/等响应头/读响应体，不用fetch/Undici默认300秒响应头限制；DeepSeek保持原fetch。无自动重试、不跟随重定向、默认TLS校验、响应上限40MiB。健康接口drawingTransportVersion=1及automation.drawingTransport=node-https用于上线核验。
 - 2026-10-29绘图诊断：drawingDiagnostics记录阶段/耗时/HTTP状态/请求ID/允许列表错误码，失败同步写容器stderr；GET作品drawing-diagnostics只读检查来源及付费输出缓存。旧失败未保存原始错误不能补造原因；Node内置Undici默认300秒是待验证线索，不能直接认定为实际故障。诊断不触发付费请求，原始错误/堆栈/响应体/凭据不记录。健康标识drawingDiagnosticsVersion=1，详见docs/DRAWING_DIAGNOSTICS.md。
 - 2026-10-29手动绘图版：自动管线只到story_ready，故事正常入库可读；Seedream仅消费网站按钮付费确认后的image_queued/drawingRequested任务。自动开关控制DeepSeek读图/故事，仍有文字/视觉API费用；明确确认的绘图独立执行。旧等待故事升级就绪，旧失败和成品保留，不自动重画。浏览器请求ID持久化防重，失败重试需再次确认可能已计费。超时600秒，保留所有缓存；新站默认daily，已有hourly/daily选择保留。上线标识story-manual-drawing-v1，详见docs/MANUAL_DRAWING.md。
 - 2026-10-28小时验证版：首次升级缺频率/新站默认hourly，从启用起每60分钟一篇；已保存daily选择保留。空间设置可切回daily（次日北京时间00:10）。按时段/相机唯一ID、空时段不生成，频率切换后旧频率未完成任务不自动付费执行，完成的小时结果在每日列表折叠历史中保留。
@@ -113,3 +114,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-29 | main | 用户确认no-ff合并fix/seedream-failure-diagnostics并推送，无冲突；部署后以drawingDiagnosticsVersion=1核验并只读检查失败作品缓存，不自动付费重试。 |
 
 | 2026-10-29 | main | 诊断版正式上线（Webhook首交付超时，补发200）；一次经用户确认的真实复现在303145ms后报UND_ERR_HEADERS_TIMEOUT，证实底层约300秒限制未被外层600秒覆盖。未收到余额不足响应、无PNG缓存，不判断计费；传输修复尚待实施，无第二次付费尝试。 |
+
+| 2026-10-29 | fix/seedream-http-timeout | 将Seedream改为原生HTTP(S)传输，修复Undici默认约300秒响应头超时；71项测试、手动绘图/服务器浏览器回归及真实等待310秒后PNG缓存发布的本地模拟通过，未新增付费绘图。用户已授权验证后直接合并main并推送；线上待drawingTransportVersion=1核验。 |

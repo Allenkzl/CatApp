@@ -1,7 +1,7 @@
 // Store only bounded, structured diagnostics. Never persist raw errors, headers,
 // provider bodies, prompts, image data, credentials or local filesystem paths.
 export const safeRequestId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v)&&!v.startsWith('sk-')&&!v.startsWith('ark-')?v:null;
-const knownCodes=new Set(['UND_ERR_HEADERS_TIMEOUT','UND_ERR_BODY_TIMEOUT','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET','ECONNRESET','ECONNREFUSED','ETIMEDOUT','ENOTFOUND','EAI_AGAIN','CERT_HAS_EXPIRED','UNABLE_TO_VERIFY_LEAF_SIGNATURE','DEPTH_ZERO_SELF_SIGNED_CERT','ENOENT','EACCES','EPERM','ENOSPC','EROFS','SEEDREAM_NO_IMAGE']);
+const knownCodes=new Set(['UND_ERR_HEADERS_TIMEOUT','UND_ERR_BODY_TIMEOUT','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET','ECONNRESET','ECONNREFUSED','ETIMEDOUT','ENOTFOUND','EAI_AGAIN','CERT_HAS_EXPIRED','UNABLE_TO_VERIFY_LEAF_SIGNATURE','DEPTH_ZERO_SELF_SIGNED_CERT','ENOENT','EACCES','EPERM','ENOSPC','EROFS','SEEDREAM_NO_IMAGE','DRAWING_RESPONSE_TOO_LARGE']);
 export function drawingFailure(error,stage){
  let code=null,at=error;for(let n=0;n<4&&at;n++,at=at.cause)if(knownCodes.has(at.code)){code=at.code;break;}
  const http=/^Seedream request failed \(HTTP (\d{3})(?:, ([A-Za-z0-9_.-]{1,100}))?\)$/.exec(error?.message||'');

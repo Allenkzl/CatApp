@@ -20,7 +20,7 @@ const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
  try{
   const requestURL=new URL(req.url,'http://localhost'),pathname=decodeURIComponent(requestURL.pathname);
-  if(pathname==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok',release:'story-manual-drawing-v1',summaryPipelineVersion:2,drawingDiagnosticsVersion:1});
+  if(pathname==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok',release:'story-manual-drawing-v1',summaryPipelineVersion:2,drawingDiagnosticsVersion:1,drawingTransportVersion:1});
   const host=new URL('http://'+(req.headers.host||'')).host;
   if(config.server?host!==new URL(config.origin).host:!['localhost','127.0.0.1'].includes(new URL('http://'+host).hostname))return json(res,403,{error:'Host not allowed'});
   const expected=config.origin||'http://'+host;
