@@ -20,7 +20,7 @@ const server=http.createServer(async(req,res)=>{
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','same-origin');
  try{
   const requestURL=new URL(req.url,'http://localhost'),pathname=decodeURIComponent(requestURL.pathname);
-  if(pathname==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok',release:'story-manual-drawing-v1',summaryPipelineVersion:2});
+  if(pathname==='/healthz'&&req.method==='GET')return json(res,200,{status:'ok',release:'story-manual-drawing-v1',summaryPipelineVersion:2,drawingDiagnosticsVersion:1});
   const host=new URL('http://'+(req.headers.host||'')).host;
   if(config.server?host!==new URL(config.origin).host:!['localhost','127.0.0.1'].includes(new URL('http://'+host).hostname))return json(res,403,{error:'Host not allowed'});
   const expected=config.origin||'http://'+host;
@@ -62,7 +62,9 @@ const server=http.createServer(async(req,res)=>{
     if(command){const input=await body(req);return json(res,200,await (command[2]==='publish'?store.publish(command[1],input):store.setGeneration(command[1],input)));}
     return json(res,405,{error:'Method not allowed'});
    }
-   if(pathname==='/api/capture')return json(res,200,{...store.snapshot(),release:'story-manual-drawing-v1',mode:config.mode,requireLogin:config.requireLogin,devices:access.snapshot(),automation:auto.snapshot(),collector:config.server?{state:'direct_upload',online:access.snapshot().some(d=>d.online)}:collector.snapshot()});
+   if(pathname==='/api/capture')return json(res,200,{...store.snapshot(),release:'story-manual-drawing-v1',drawingDiagnosticsVersion:1,mode:config.mode,requireLogin:config.requireLogin,devices:access.snapshot(),automation:auto.snapshot(),collector:config.server?{state:'direct_upload',online:access.snapshot().some(d=>d.online)}:collector.snapshot()});
+   const diagnostics=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\/drawing-diagnostics$/);
+   if(diagnostics){const w=store.index.works.find(w=>w.id===diagnostics[1]);if(!w)return json(res,404,{error:'Unknown work'});return json(res,200,{workId:w.id,status:w.status,runtime:{node:process.version,undici:process.versions.undici||null},lastAttempt:w.drawingDiagnostics||null,...await auto.drawing.inspect(w)});}
    const album=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\/photos$/);if(album)return json(res,200,store.workPhotos(album[1],Number(requestURL.searchParams.get('offset')||0),Number(requestURL.searchParams.get('limit')||24)));
    const photo=pathname.match(/^\/api\/capture\/photos\/([a-f0-9]{24})\.jpg$/),comic=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\.svg$/),art=pathname.match(/^\/api\/capture\/works\/([a-f0-9]{24})\/artwork\/([a-f0-9]{64})\.png$/);
    if(art||photo){const file=art?await store.artworkFile(art[1],art[2]):await store.photoFile(photo[1]);if(!file)return json(res,404,{error:'Image not found'});res.writeHead(200,{'Content-Type':art?'image/png':'image/jpeg','Cache-Control':'private, no-store'}).end(await readFile(file));return;}

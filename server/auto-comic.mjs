@@ -1,3 +1,4 @@
+import {drawingFailure} from './drawing-diagnostics.mjs';
 import {isSummary} from './daily-summary.mjs';
 import {readFile,writeFile,rename,chmod} from 'node:fs/promises';
 import path from 'node:path';
@@ -28,9 +29,12 @@ export class AutoComic {
  }
  tick(){if(!this.enabled()&&!this.store.index.works.some(w=>w.status==='image_queued'&&w.drawingRequested))return this.running||Promise.resolve();if(this.running)return this.running;this.running=this.run().finally(()=>this.running=null);return this.running;}
  async draw(work){
-  await this.store.updateJob(work.id,{status:'drawing',error:null,generationStage:'image',drawingRequested:false,drawingAttempts:(work.drawingAttempts||0)+1});
-  try{const result=await this.drawing.generate(work);await this.store.publish(work.id,result);}
-  catch(e){const message=e.message.startsWith('Seedream request failed')?e.message:e.name==='TimeoutError'?'Seedream timed out after 10 minutes. Story is saved; confirm provider billing before retrying.':'Image generation did not complete. Check drawing configuration or recover the saved output.';await this.store.updateJob(work.id,{status:'image_failed',drawingRequested:false,error:message});}
+  const startedAt=new Date().toISOString(),started=Date.now();
+  let diagnostic={version:1,startedAt,stage:'preparing_sources',model:this.drawing.config.model,cacheReused:false};
+  const progress=async(stage,patch={})=>{diagnostic={...diagnostic,...patch,stage,updatedAt:new Date().toISOString(),elapsedMs:Date.now()-started};await this.store.updateJob(work.id,{drawingDiagnostics:diagnostic});};
+  await this.store.updateJob(work.id,{status:'drawing',error:null,generationStage:'image',drawingRequested:false,drawingAttempts:(work.drawingAttempts||0)+1,drawingDiagnostics:diagnostic});
+  try{const result=await this.drawing.generate(work,{onProgress:progress});await progress('publishing');await this.store.publish(work.id,result);try{await progress('completed');}catch{console.error(JSON.stringify({event:'drawing_diagnostic_save_failed',workId:work.id,stage:'completed'}));}}
+  catch(e){const failure=drawingFailure(e,diagnostic.stage);diagnostic={...diagnostic,...failure,finishedAt:new Date().toISOString(),elapsedMs:Date.now()-started};console.error(JSON.stringify({event:'drawing_failed',workId:work.id,...diagnostic}));await this.store.updateJob(work.id,{status:'image_failed',drawingRequested:false,error:failure.message,drawingDiagnostics:diagnostic});}
  }
  async runSummary(work){
   const attempt=(work.attempts||0)+1;

@@ -1,6 +1,6 @@
 import {html, t, demoText, language, setLanguage, originalField, workTitle} from './i18n.js';
 import {defaults, DEMO_DATE, ACTIONS, ZONES, pages} from './data.js';
-import {capture, startCaptureSync, refreshCapture, dailyPhotos, dailyWorks, syncNotice, progress, photoCards, workCards, photoDetail, workDetail, exportDaily, retryDaily, post, automationSettings, cameraSettings, statusLabel, visibleWorks, loadMoreWorkPhotos, dailyPreviewButton, dailyPreviewDetail} from './capture.js';
+import {capture, startCaptureSync, refreshCapture, dailyPhotos, dailyWorks, syncNotice, progress, photoCards, workCards, photoDetail, workDetail, exportDaily, retryDaily, post, automationSettings, cameraSettings, statusLabel, visibleWorks, loadMoreWorkPhotos, dailyPreviewButton, dailyPreviewDetail, drawingDiagnosticsDetail} from './capture.js';
 import {esc as e, icon, balconyScene, activityChart, mapArt} from './art.js';
 
 const KEY='catapp-prototype-v1';
@@ -115,6 +115,7 @@ document.addEventListener('click',async event=>{
  if(action==='stop-collector'){try{await post('/api/collector',{action:'stop'});await refreshCapture(false,()=>true);render();}catch(error){notify(error.message);}}
  if(action==='daily-preview'){try{const result=await post('/api/daily/preview',{date:ui.date});modal(language()==='en'?'Daily source preview':'当日素材预览',dailyPreviewDetail(result),true);}catch(error){notify(error.message);}return;}
  if(action==='capture-more-photos'){try{await loadMoreWorkPhotos(id);openCaptureWork(id);}catch(error){notify(error.message);}return;}
+ if(action==='capture-diagnostics'){try{const r=await fetch('/api/capture/works/'+id+'/drawing-diagnostics',{cache:'no-store'});const result=await r.json();if(!r.ok)throw Error(result.error);ui.captureWorkId=null;modal(language()==='en'?'Drawing diagnostics':'绘图诊断',drawingDiagnosticsDetail(result),true);}catch(error){notify(error.message);}return;}
  if(action==='capture-draw'){
   const w=capture.works.find(w=>w.id===id);if(!w)return;ui.captureWorkId=null;
   const retry=w.status==='image_failed';

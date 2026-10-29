@@ -41,3 +41,25 @@ test('a confirmed drawing queued before restart runs once even when scheduled st
  const restored=await new CaptureStore({generationMode:'batch',inputRoot:input,dataDir:store.dataDir}).init();const restarted=await new AutoComic(restored,{fetchImpl:auto.fetch}).init();assert.equal(restarted.enabled(),false);assert.equal(restored.index.works[0].status,'image_queued');
  await restarted.tick();await restarted.tick();assert.equal(calls,1);assert.equal(restored.index.works[0].status,'completed');
 });
+
+
+test('network failures retain the underlying timeout code and phase without leaking raw errors',async t=>{
+ const raw='sk-private-value must not be logged';let calls=0;const {auto,store}=await setup(t,async()=>{calls++;throw new TypeError(raw,{cause:Object.assign(new Error(raw),{code:'UND_ERR_HEADERS_TIMEOUT'})});});
+ const logs=[];t.mock.method(console,'error',line=>logs.push(line));await auto.tick();const w=store.index.works[0];assert.equal(w.status,'image_failed');assert.equal(w.drawingDiagnostics.stage,'provider_request');assert.equal(w.drawingDiagnostics.code,'UND_ERR_HEADERS_TIMEOUT');assert.match(w.error,/response headers/);assert.ok(w.drawingDiagnostics.elapsedMs>=0);assert.ok(w.drawingDiagnostics.requestBytes>0);assert.ok(!JSON.stringify({w,logs}).includes(raw));assert.equal(logs.length,1);await auto.tick();assert.equal(calls,1);
+});
+
+test('provider rejection records HTTP status, provider code and request ID; JSON and empty-image failures identify their stages',async t=>{
+ const {auto,store,work}=await setup(t,async()=>({ok:false,status:400,headers:new Headers({'x-request-id':'req-diagnostic-123'}),json:async()=>({error:{code:'InvalidParameter',message:'sensitive raw response'}})}));
+ await auto.tick();let w=store.index.works[0];assert.equal(w.drawingDiagnostics.stage,'provider_response');assert.equal(w.drawingDiagnostics.httpStatus,400);assert.equal(w.drawingDiagnostics.providerCode,'InvalidParameter');assert.equal(w.drawingDiagnostics.requestId,'req-diagnostic-123');assert.ok(!JSON.stringify(w).includes('sensitive raw response'));
+ auto.drawing.fetch=async()=>({ok:true,status:200,json:async()=>{throw new SyntaxError('secret body');}});await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();w=store.index.works[0];assert.equal(w.drawingDiagnostics.stage,'provider_response');assert.match(w.error,/valid JSON/);
+ auto.drawing.fetch=async()=>({ok:true,status:200,json:async()=>({request_id:'req-no-image',data:[]})});await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();w=store.index.works[0];assert.equal(w.drawingDiagnostics.stage,'decoding_response');assert.equal(w.drawingDiagnostics.code,'SEEDREAM_NO_IMAGE');assert.equal(w.drawingDiagnostics.requestId,'req-no-image');
+});
+
+test('read-only cache inspection distinguishes missing, incomplete and recoverable paid output without calling a provider',async t=>{
+ let calls=0;const {auto,store,work}=await setup(t,async()=>{calls++;return {ok:true,json:async()=>({data:[{b64_json:pngFixture().toString('base64')}]})};});
+ let r=await auto.drawing.inspect(work);assert.equal(calls,0);assert.equal(r.style.exists,true);assert.equal(r.sources.filter(p=>p.exists).length,3);assert.equal(r.cache.image.exists,false);
+ const publish=store.publish;store.publish=async()=>{throw Error('private filesystem detail');};await auto.tick();assert.equal(store.index.works[0].drawingDiagnostics.stage,'publishing');assert.ok(!store.index.works[0].error.includes('private filesystem detail'));
+ r=await auto.drawing.inspect(work);assert.equal(calls,1);assert.equal(r.cache.image.exists,true);assert.equal(r.cache.metadata.exists,true);assert.equal(r.cache.matchesCurrentRequest,true);assert.equal(r.cache.publicationValid,true);assert.ok(!JSON.stringify(r).includes(store.dataDir));
+ store.publish=publish;await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();assert.equal(calls,1);assert.equal(store.index.works[0].drawingDiagnostics.cacheReused,true);assert.equal(store.index.works[0].drawingDiagnostics.stage,'completed');
+ await rm(path.join(store.dataDir,'jobs',work.id,'seedream-publication.json'));r=await auto.drawing.inspect(work);assert.equal(r.cache.image.exists,true);assert.equal(r.cache.metadata.exists,false);assert.equal(calls,1);
+});
