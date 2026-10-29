@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`fix/seedream-http-timeout`，将Seedream专用请求从fetch改为原生HTTP(S)，10分钟总截止覆盖响应头和响应体，保留手动确认/防重/缓存/诊断。用户已授权验证通过后直接合并main并推送，真实付费绘图留给用户在网站测试。
+- 活跃分支：无。fix/seedream-http-timeout已按用户授权无冲突合并main（功能6a9571d），71项测试和310秒后PNG缓存发布模拟通过。准备推送并核对drawingTransportVersion=1；真实付费绘图留给用户在网站测试。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
@@ -116,3 +116,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-29 | main | 诊断版正式上线（Webhook首交付超时，补发200）；一次经用户确认的真实复现在303145ms后报UND_ERR_HEADERS_TIMEOUT，证实底层约300秒限制未被外层600秒覆盖。未收到余额不足响应、无PNG缓存，不判断计费；传输修复尚待实施，无第二次付费尝试。 |
 
 | 2026-10-29 | fix/seedream-http-timeout | 将Seedream改为原生HTTP(S)传输，修复Undici默认约300秒响应头超时；71项测试、手动绘图/服务器浏览器回归及真实等待310秒后PNG缓存发布的本地模拟通过，未新增付费绘图。用户已授权验证后直接合并main并推送；线上待drawingTransportVersion=1核验。 |
+
+| 2026-10-29 | main | 按用户预先授权no-ff合并fix/seedream-http-timeout，无冲突；清理本地功能分支，推送后核对drawingTransportVersion=1。71项测试及310秒完整模拟通过，不自动发起付费绘图。 |
