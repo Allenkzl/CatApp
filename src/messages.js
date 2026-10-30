@@ -448,6 +448,20 @@ Open Datalogger × Seeed · 来源批次|Open Datalogger × Seeed · Source batc
 今天也是平凡又可爱的一天。|Another ordinary, lovely day.
 新导入素材，请人工填写观察对象、行为和实际片段时长。|Newly imported media. Please enter the subject, activity and actual clip duration.
 仅导出记录与作品，不包含素材文件。|Records and works only; media files are not included.
+观察摘要|Observation summary
+蓝白短毛，圆脸，琥珀色眼睛，胸口和爪子是白色|Blue-and-white short fur, round face, amber eyes, white chest and paws.
+爱巡逻、爱探头，走路带风。|Loves patrolling and peeking; walks with purpose.
+更活泼：白天多次沿通道和食盆区移动，喜欢巡视入口。|More active: moves along the walkway and food-bowl area repeatedly during the day, and likes to patrol the entrance.
+短毛虎斑，额头有深色条纹，身形紧凑|Short tabby fur with dark forehead stripes and a compact build.
+不慌不忙，喜欢在休息区看风景。|Unhurried; likes watching the view from the rest area.
+更慵懒：长时间停留在休息区，行动慢，露面较少。|More relaxed: stays in the rest area for long stretches, moves slowly, and appears less often.
+Xixi 和 Didi，谁更爱在阳台巡逻？|Xixi or Didi: who patrols the balcony more?
+Xixi 在入口附近停留，随后沿通道走开。|Xixi lingered near the entrance, then walked down the walkway.
+Didi 在休息区保持低运动状态。|Didi stayed mostly still in the rest area.
+Xixi 进入食盆区域，停留后离开。|Xixi visited the food bowl area, lingered, then left.
+Didi 在 Xixi 离开后进入食盆区域。|Didi entered the food bowl area after Xixi left.
+Xixi 沿花盆旁的通道来回移动。|Xixi moved back and forth along the walkway beside the planters.
+“阳台巡逻员”等昵称和观察摘要为创作设定，来自演示事件，不代表已验证的长期性格结论。|Nicknames such as “Balcony patrol” and the observation summaries are creative settings based on demo events, not verified long-term personality conclusions.
 `.trim().split('\n').filter(Boolean).map(line => line.split('|')));
 
 // Existing English decorative copy also follows Chinese mode. Product names stay as brands.

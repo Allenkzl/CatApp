@@ -10,13 +10,13 @@ test('template localization preserves interpolated user content and private path
 });
 test('saving unchanged localized seed fields keeps canonical data, while custom fields remain original',()=>{
  setLanguage('en');
- const cat={name:'橘子',tag:'阳台巡逻员'};
- assert.equal(demoText(cat.name),'Mikan');
- assert.equal(originalField(cat,'name','Mikan'),'橘子');
- assert.equal(originalField(cat,'name','我家的猫'),'我家的猫');
+ const cat={name:'Xixi',tag:'阳台巡逻员'};
+ assert.equal(demoText(cat.tag),'Balcony patrol');
+ assert.equal(originalField(cat,'tag','Balcony patrol'),'阳台巡逻员');
+ assert.equal(originalField(cat,'tag','我家的猫'),'我家的猫');
  assert.equal(demoText('工作台'),'工作台');
  setLanguage('zh');
- assert.equal(demoText(cat.name),'橘子');
+ assert.equal(demoText(cat.tag),'阳台巡逻员');
 });
 test('daily titles translate deterministically without mutating persisted work metadata',()=>{
  const work={title:'每日漫画 · 2026.10.20 / 第 2 篇'};
