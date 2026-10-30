@@ -31,3 +31,14 @@ test('different cameras and dates never share a comic',async t=>{
  const ctx=await setup(t);for(const [name,camera] of [['cats-one','a'],['cats-two','b']]){const b=await batch(ctx.input,name,2);await writeFile(path.join(b.dir,'photos.json'),JSON.stringify(b.records.map(r=>({...r,camera_id:camera}))));}
  const store=await ctx.create();assert.equal(store.index.works.length,0);assert.equal(store.snapshot().pending.length,2);
 });
+test('hidden photos are excluded from gallery, albums and previews and survive restart',async t=>{
+ const ctx=await setup(t);await batch(ctx.input,'cats-hide',3);const store=await ctx.create();
+ const work=store.index.works[0],hidden=store.index.photos[0].id;
+ assert.equal((await store.hidePhotos([hidden])).changed,1);
+ assert.equal(store.snapshot().photos.length,2);
+ assert.ok(!store.snapshot().photos.some(p=>p.id===hidden));
+ const album=store.workPhotos(work.id);assert.equal(album.total,2);assert.ok(!album.photos.some(p=>p.id===hidden));
+ const preview=store.previewDay('2026-10-20');assert.ok(preview.plans.every(p=>!p.photoIds.includes(hidden)));
+ const restarted=await ctx.create();assert.ok(!restarted.snapshot().photos.some(p=>p.id===hidden));
+ await restarted.hidePhotos([hidden],false);assert.ok(restarted.snapshot().photos.some(p=>p.id===hidden));
+});

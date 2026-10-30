@@ -135,3 +135,4 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-30 | fix/seedream-small-base64 | URL参考图被方舟400 InvalidParameter拒绝后，改为压缩风格图+2张照片的小体积Base64（约2.5MB）、url回包、独立下载与URL复用、1152×1536；76项测试通过，未付费调用。待部署后以`seedreamSmallReferenceVersion=1`和`drawingReferenceMode=base64-limited`核验。 |
 
 | 2026-10-30 | feature/cat-profiles-xixi-didi | 按用户确认把猫咪档案改为 Xixi（蓝白，Wikimedia Commons）与 Didi（虎斑），补充“Xixi 更活泼、Didi 更慵懒”的观察摘要；习惯页地图/图例/事件/摘要/问题同步，旧本地状态自动迁移；76项测试通过，用户预览确认后合并 main 上线。 |
+| 2026-10-30 | feature/hide-dog-photos | 新增按识别标签隐藏照片：设备凭证调用 POST /api/capture/photos/hide，把带 dog 标签的照片标记 hidden；hidden 照片不再出现在照片列表、作品相册、每日预览及后续每日计划，媒体文件保留供既有作品，可用 hidden:false 恢复；77项测试通过。 |
