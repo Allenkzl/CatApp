@@ -20,7 +20,7 @@ export function drawingFetch(url,{method='POST',headers={},body,signal,maxRespon
     rejectBody=failed;
     const tooLarge=()=>{const error=new Error('Drawing response exceeds the size limit');error.code='DRAWING_RESPONSE_TOO_LARGE';fail(error);req.destroy(error);res.destroy(error);};
     res.on('data',chunk=>{size+=chunk.length;if(size>maxResponseBytes){tooLarge();return;}chunks.push(chunk);});
-    res.once('end',()=>done(Buffer.concat(chunks).toString('utf8')));
+    res.once('end',()=>done(Buffer.concat(chunks)));
     res.once('error',fail);
     res.once('aborted',()=>{const error=new Error('Drawing response was interrupted');error.code='ECONNRESET';fail(error);});
     if(Number(res.headers['content-length'])>maxResponseBytes)tooLarge();
@@ -28,7 +28,7 @@ export function drawingFetch(url,{method='POST',headers={},body,signal,maxRespon
    // The caller may be saving its response-header checkpoint before reading JSON.
    // Keep early body errors handled without losing the rejection for json().
    content.catch(()=>{});
-   resolve({ok:res.statusCode>=200&&res.statusCode<300,status:res.statusCode,headers:{get(name){const v=res.headers[name.toLowerCase()];return Array.isArray(v)?v.join(', '):v??null;}},json:async()=>JSON.parse(await content)});
+   resolve({ok:res.statusCode>=200&&res.statusCode<300,status:res.statusCode,headers:{get(name){const v=res.headers[name.toLowerCase()];return Array.isArray(v)?v.join(', '):v??null;}},buffer:async()=>await content,json:async()=>JSON.parse((await content).toString('utf8'))});
   });
   req.once('socket',socket=>{socket.once('lookup',()=>transport.dnsMs=Date.now()-started);socket.once('connect',()=>{transport.tcpMs=Date.now()-started;transport.remoteFamily=socket.remoteFamily;});socket.once('secureConnect',()=>{transport.tlsMs=Date.now()-started;transport.tlsAuthorized=socket.authorized===true;});});
   req.once('finish',()=>{transport.uploadComplete=true;transport.uploadFinishedMs=Date.now()-started;});

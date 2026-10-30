@@ -63,3 +63,32 @@ test('read-only cache inspection distinguishes missing, incomplete and recoverab
  store.publish=publish;await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();assert.equal(calls,1);assert.equal(store.index.works[0].drawingDiagnostics.cacheReused,true);assert.equal(store.index.works[0].drawingDiagnostics.stage,'completed');
  await rm(path.join(store.dataDir,'jobs',work.id,'seedream-publication.json'));r=await auto.drawing.inspect(work);assert.equal(r.cache.image.exists,true);assert.equal(r.cache.metadata.exists,false);assert.equal(calls,1);
 });
+
+test('URL reference mode sends public URLs, downloads the paid image and reuses the saved URL after a download failure',async t=>{
+ const previous=process.env.CAT_PUBLIC_URL;process.env.CAT_PUBLIC_URL='https://cats.example';t.after(()=>{if(previous===undefined)delete process.env.CAT_PUBLIC_URL;else process.env.CAT_PUBLIC_URL=previous;});
+ let posts=0,downloads=0,failDownload=true;
+ const {auto,store,work}=await setup(t,async(url,opts)=>{
+  if(opts.method==='GET'){
+   downloads++;assert.equal(url,'https://cdn.example/result.png');
+   if(failDownload)throw new Error('simulated download interruption');
+   return {ok:true,status:200,buffer:async()=>pngFixture()};
+  }
+  posts++;assert.equal(url,'https://ark.cn-beijing.volces.com/api/v3/images/generations');
+  const body=JSON.parse(opts.body);
+  assert.equal(body.response_format,'url');assert.equal(body.output_format,'png');assert.equal(body.image.length,4);
+  assert.ok(body.image.every(u=>u.startsWith('https://cats.example/')));
+  assert.match(body.image[0],/\/public\/comic-style-reference-en\.jpg$/);
+  assert.match(body.image[1],/\/api\/capture\/photos\/a{24}\.jpg$/);
+  return {ok:true,json:async()=>({data:[{url:'https://cdn.example/result.png'}]})};
+ });
+ await auto.tick();
+ assert.equal(posts,1);assert.equal(downloads,1);assert.equal(store.index.works[0].status,'image_failed');
+ assert.ok((await stat(path.join(store.dataDir,'jobs',work.id,'seedream-result.url'))).isFile());
+ assert.equal(auto.drawing.snapshot().drawingReferenceMode,'url');
+ failDownload=false;
+ await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});
+ await auto.tick();
+ assert.equal(posts,1);assert.equal(downloads,2);assert.equal(store.index.works[0].status,'completed');
+ assert.equal(store.index.works[0].artwork.metadata.generationMode,'seedream-api');
+ assert.ok(!JSON.stringify(store.index.works[0]).includes('simulated download interruption'));
+});
