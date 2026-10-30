@@ -17,12 +17,12 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`feature/seedream-url-reference`（待合并/部署）。云端到方舟的小请求正常（60KB约0.7秒），但12.4MB上行600秒未完成、约11MB回包180秒未完成；同机到DeepSeek的6.5MB上行正常，问题限定在容器到方舟的大流量路径。本轮改为公网URL参考图+url回包+1152×1536输出，尽量把每次传输压到几MB；真实付费验收待用户在网站点击测试。
+- 活跃分支：`fix/seedream-small-base64`（待合并/部署）。云端到方舟的小请求正常（60KB约0.7秒），但12.4MB上行600秒未完成、约11MB回包180秒未完成；公网URL参考图又被方舟400 `InvalidParameter`拒绝。当前改为2张照片+压缩风格图的小体积Base64（约2.5MB）+url回包+1152×1536输出；真实付费验收待用户在网站点击测试。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
 ## 重要约定
-- 2026-10-30云端大传输改造：当生产`CAT_PUBLIC_URL`为https时，Seedream请求改为传风格图与来源照片的公网URL（不再内嵌base64），`response_format=url`，回包小于1KB；拿到URL后先写`seedream-result.url`再下载，下载失败重试可复用该URL（23小时内）而不重复付费。日汇总输出改为`1152x1536`（PNG约3–4MB），风格图改用1024px JPEG；图片下载支持最多2次HTTPS重定向、600秒和24MiB上限。要求站点照片可公网访问（当前免登录）；若方舟无法从Cloudflare拉图，会失败。上线核验`/healthz`的`seedreamUrlReferenceVersion=1`及`automation.drawingReferenceMode=url`。本轮未发起真实付费调用，方舟实际拉图、最终PNG大小和画质待用户测试。
+- 2026-10-30云端大传输改造：先尝试公网URL参考图（请求5066字节、`referenceMode:url`），方舟12.6秒后返回HTTP 400 `InvalidParameter`，未生成图片；模型/密钥已由无效模型探测排除，失败点在方舟拉取9个公网URL。随后改为小体积Base64：风格图用1024px JPEG，参考照片只取2张（`SEEDREAM_REFERENCE_LIMIT`默认2，0–10可调），请求约2.5MB；`response_format=url`，回包小于1KB；拿到URL先写`seedream-result.url`再下载，失败重试复用（23小时）不重复付费；日汇总输出`1152x1536`（PNG约3–4MB）；下载支持最多2次HTTPS重定向、600秒、24MiB。上线核验`/healthz`的`seedreamSmallReferenceVersion=1`及`automation.drawingReferenceMode=base64-limited`。76项测试通过，未付费调用；2张参考图会降低外观一致性，真实效果待用户测试。
 - 2026-10-29方舟网络自检：POST /api/drawing/network-check只接受空对象，固定官方主机GET模型目录/HEAD路由，默认与IPv4对照、可选IPv6，不生成图片。请求同进程合并且60秒缓存；代理仅布尔标记，密钥/地址/原始响应不返回。health arkNetworkCheckVersion=1，详见docs/ARK_NETWORK_CHECK.md。未来手动绘图失败的transport字段记录TCP/TLS/客户端写出是否完成，不能把写出等同于服务商接收成功。
 - 2026-10-29传输修复：Seedream生产默认走server/drawing-http.mjs原生HTTPS，显式600秒AbortSignal覆盖上传/等响应头/读响应体，不用fetch/Undici默认300秒响应头限制；DeepSeek保持原fetch。无自动重试、不跟随重定向、默认TLS校验、响应上限40MiB。健康接口drawingTransportVersion=1及automation.drawingTransport=node-https用于上线核验。
 - 2026-10-29绘图诊断：drawingDiagnostics记录阶段/耗时/HTTP状态/请求ID/允许列表错误码，失败同步写容器stderr；GET作品drawing-diagnostics只读检查来源及付费输出缓存。旧失败未保存原始错误不能补造原因；Node内置Undici默认300秒是待验证线索，不能直接认定为实际故障。诊断不触发付费请求，原始错误/堆栈/响应体/凭据不记录。健康标识drawingDiagnosticsVersion=1，详见docs/DRAWING_DIAGNOSTICS.md。
@@ -131,3 +131,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 
 | 2026-10-29 | main | 云容器方舟自检已上线并实测：IPv4基础网络与密钥鉴权正常，目录200约3秒；IPv6不可达但默认已IPv4成功，不能归因。待进一步定位12.4MB请求上传或后续处理；没有新增付费模型调用，验收记录仅本地提交避免再部署。 |
 | 2026-10-30 | feature/seedream-url-reference | 云端到方舟的多MB传输受限，改为公网URL参考图（风格图JPEG+8张照片URL）、`response_format=url`、独立下载与URL复用、日汇总输出1152×1536；76项测试、手动绘图及短延时传输模拟通过（310秒完整模拟为改动前结果），未付费调用。待合并推送后以`seedreamUrlReferenceVersion=1`和`drawingReferenceMode=url`核验，并由用户实测。 |
+
+| 2026-10-30 | fix/seedream-small-base64 | URL参考图被方舟400 InvalidParameter拒绝后，改为压缩风格图+2张照片的小体积Base64（约2.5MB）、url回包、独立下载与URL复用、1152×1536；76项测试通过，未付费调用。待部署后以`seedreamSmallReferenceVersion=1`和`drawingReferenceMode=base64-limited`核验。 |
