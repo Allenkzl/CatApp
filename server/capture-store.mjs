@@ -38,6 +38,7 @@ function localDate(iso){
 }
 export class CaptureStore {
  constructor({inputRoot,dataDir,now=()=>new Date(),generationMode='daily',initialFrequency='daily'}){this.now=now;this.generationMode=generationMode;this.initialFrequency=initialFrequency;this.inputRoot=inputRoot?path.resolve(inputRoot):null;this.dataDir=path.resolve(dataDir);this.index={version:1,photos:[],works:[],settings:{batchPhotoCount:3},groups:[]};this.errors=[];this.status='waiting';this.running=null;this.queue=Promise.resolve();}
+ visiblePhotos(){return this.index.photos.filter(p=>!p.hidden);}
  async init(){
   await mkdir(path.join(this.dataDir,'media'),{recursive:true});
   await mkdir(path.join(this.dataDir,'comics'),{recursive:true});
@@ -106,18 +107,18 @@ export class CaptureStore {
  }
  previewDay(day,cameraId){
   if(!validDay(day)){const e=new Error('Invalid date');e.statusCode=400;throw e;}
-  const cameras=[...new Set(this.index.photos.filter(p=>p.date===day).map(p=>p.cameraId||'recamera-default'))];
-  return {previewOnly:true,paidGeneration:false,date:day,plans:cameras.filter(id=>!cameraId||id===cameraId).map(id=>dailyPlan(this.index.photos,day,id,this.index.settings.panelCount||8))};
+  const cameras=[...new Set(this.visiblePhotos().filter(p=>p.date===day).map(p=>p.cameraId||'recamera-default'))];
+  return {previewOnly:true,paidGeneration:false,date:day,plans:cameras.filter(id=>!cameraId||id===cameraId).map(id=>dailyPlan(this.visiblePhotos(),day,id,this.index.settings.panelCount||8))};
  }
  scheduleDaily(){
   let changed=false;const settings=this.index.settings,now=this.now();
   if(settings.summaryFrequency==='hourly')return this.scheduleHourly(now);
-  const keys=new Map(this.index.photos.map(p=>[(p.cameraId||'recamera-default')+'/'+p.date,{date:p.date,cameraId:p.cameraId||'recamera-default'}]));
+  const keys=new Map(this.visiblePhotos().map(p=>[(p.cameraId||'recamera-default')+'/'+p.date,{date:p.date,cameraId:p.cameraId||'recamera-default'}]));
   for(const {date,cameraId} of keys.values()){
    if(date<settings.dailyStartDate||dueAt(date,settings.dailyTime)>now)continue;
    const id=dailyId(cameraId,date);if(this.index.works.some(w=>w.id===id))continue;
    const start=date+'T00:00:00+08:00',end=new Date(Date.parse(start)+86400000);
-   const plan=periodPlan(this.index.photos,start,end,cameraId,settings.panelCount);
+   const plan=periodPlan(this.visiblePhotos(),start,end,cameraId,settings.panelCount);
    if(!plan.photoIds.length)continue;
    this.index.works.push({...plan,id,kind:'daily-summary',title:`Daily Cat Summary · ${date}`,createdAt:now.toISOString(),scheduledFor:dueAt(date,settings.dailyTime).toISOString(),mode:'illustrated-comic',status:'ready_for_generation',comicUrl:null});changed=true;
   }
@@ -127,7 +128,7 @@ export class CaptureStore {
   const anchor=Date.parse(this.index.settings.hourlyAnchorAt);if(!Number.isFinite(anchor))throw new Error('Invalid hourly schedule anchor');
   const completed=Math.floor((now.getTime()-anchor)/3600000);if(completed<1)return false;
   const windows=new Map();
-  for(const p of this.index.photos){const n=Math.floor((Date.parse(p.capturedAt)-anchor)/3600000);if(n<0||n>=completed)continue;const camera=p.cameraId||'recamera-default';windows.set(camera+'/'+n,{camera,n});}
+  for(const p of this.visiblePhotos()){const n=Math.floor((Date.parse(p.capturedAt)-anchor)/3600000);if(n<0||n>=completed)continue;const camera=p.cameraId||'recamera-default';windows.set(camera+'/'+n,{camera,n});}
   let changed=false;
   for(const {camera,n} of windows.values()){
    const start=new Date(anchor+n*3600000),end=new Date(start.getTime()+3600000),id=hourlyId(camera,start);if(this.index.works.some(w=>w.id===id))continue;
@@ -138,8 +139,8 @@ export class CaptureStore {
  }
  workEligible(work){return this.index.settings.generationMode!=='daily'||!isSummary(work)||workFrequency(work)===(this.index.settings.summaryFrequency||'daily');}
  albumIds(work){
-  if(!isSummary(work)||!work.periodStart||!work.periodEnd)return work.allPhotoIds||work.photoIds;
-  return this.index.photos.filter(p=>(p.cameraId||'recamera-default')===work.cameraId&&p.capturedAt>=work.periodStart&&p.capturedAt<work.periodEnd).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt)||a.id.localeCompare(b.id)).map(p=>p.id);
+  if(!isSummary(work)||!work.periodStart||!work.periodEnd){const hidden=new Set(this.index.photos.filter(p=>p.hidden).map(p=>p.id));return (work.allPhotoIds||work.photoIds).filter(id=>!hidden.has(id));}
+  return this.visiblePhotos().filter(p=>(p.cameraId||'recamera-default')===work.cameraId&&p.capturedAt>=work.periodStart&&p.capturedAt<work.periodEnd).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt)||a.id.localeCompare(b.id)).map(p=>p.id);
  }
  workPhotos(id,offset=0,limit=24){
   const work=this.index.works.find(w=>w.id===id);if(!work){const e=new Error('Unknown work');e.statusCode=404;throw e;}
@@ -151,7 +152,7 @@ export class CaptureStore {
   let changed=false;
   const assigned=new Set(this.index.works.flatMap(w=>w.photoIds));
   const groups=new Map();
-  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id)).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt))){
+  for(const photo of this.visiblePhotos().filter(p=>!assigned.has(p.id)).sort((a,b)=>a.capturedAt.localeCompare(b.capturedAt))){
    const key=(photo.cameraId||'recamera-default')+'/'+photo.date;
    if(!groups.has(key))groups.set(key,[]);groups.get(key).push(photo);
   }
@@ -170,12 +171,12 @@ export class CaptureStore {
  snapshot(){
   const daily=this.index.settings.generationMode==='daily';
   const assigned=new Set(this.index.works.filter(w=>!daily||isSummary(w)).flatMap(w=>w.allPhotoIds||w.photoIds)),pending=[];
-  for(const photo of this.index.photos.filter(p=>!assigned.has(p.id))){
+  for(const photo of this.visiblePhotos().filter(p=>!assigned.has(p.id))){
    const key=(photo.cameraId||'recamera-default')+'/'+photo.date;
    let group=pending.find(g=>g.key===key);
    if(!group){group={key,session:photo.session,date:photo.date,count:0,target:daily?null:this.index.groups.find(g=>g.key===key)?.target||this.index.settings.batchPhotoCount};pending.push(group);}group.count++;
   }
-  return {...this.index,works:this.index.works.map(w=>{if(!isSummary(w))return w;const album=this.albumIds(w),frozen=new Set(w.allPhotoIds||w.photoIds);return {...w,albumPhotoIds:album,latePhotoCount:album.filter(id=>!frozen.has(id)).length};}),schedule:scheduleState(this.index.settings,this.now()),pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
+  return {...this.index,photos:this.visiblePhotos(),works:this.index.works.map(w=>{if(!isSummary(w))return w;const album=this.albumIds(w),frozen=new Set(w.allPhotoIds||w.photoIds);return {...w,albumPhotoIds:album,latePhotoCount:album.filter(id=>!frozen.has(id)).length};}),schedule:scheduleState(this.index.settings,this.now()),pending,inputRoot:this.inputRoot,status:this.status,errors:[...new Set(this.errors)].slice(0,10)};
  }
  ingestUpload(deviceId,metadata,buffer){return this.enqueue(async()=>{
   const bad=message=>{const e=new Error(message);e.statusCode=400;throw e;};
@@ -191,6 +192,12 @@ export class CaptureStore {
   this.groupUnassigned();
   try{await this.save();}catch(e){this.index=previous;throw e;}
   return {photoId:id,duplicate:false};
+ });}
+ hidePhotos(ids,hidden=true){return this.enqueue(async()=>{
+  const set=new Set(ids),flag=hidden!==false;let changed=0;
+  this.index={...this.index,photos:this.index.photos.map(p=>{if(!set.has(p.id))return p;if((p.hidden===true)!==flag){changed++;return {...p,hidden:flag};}return p;})};
+  if(changed)await this.save();
+  return {changed,hidden:this.index.photos.filter(p=>p.hidden).length};
  });}
  updateSettings(input){return this.enqueue(async()=>{
   if(this.index.settings.generationMode==='daily'){

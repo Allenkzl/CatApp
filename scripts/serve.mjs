@@ -43,6 +43,13 @@ const server=http.createServer(async(req,res)=>{
    if(req.headers['content-type']?.split(';')[0]!=='image/jpeg')return json(res,415,{error:'Content-Type must be image/jpeg'});
    const result=await store.ingestUpload(device.id,{photoId:req.headers['x-catapp-photo-id'],capturedAt:req.headers['x-catapp-captured-at']},await bytes(req,30*1024*1024));access.heartbeat(device,'collecting');return json(res,result.duplicate?200:201,{accepted:true,...result});
   }
+  if(pathname==='/api/capture/photos/hide'){
+   if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
+   const device=access.device(req);if(!device)return json(res,401,{error:'Device credential required'});
+   const input=await body(req);
+   if(!input||!Array.isArray(input.ids)||input.ids.length>1000||input.ids.some(id=>typeof id!=='string'||!/^[a-f0-9]{24}$/.test(id)))return json(res,400,{error:'Invalid photo IDs'});
+   return json(res,200,await store.hidePhotos(input.ids,input.hidden!==false));
+  }
   if(!access.authorized(req)){
    if(pathname.startsWith('/api/'))return json(res,401,{error:'Login required'});
    res.writeHead(303,{Location:'/login','Cache-Control':'no-store'}).end();return;
