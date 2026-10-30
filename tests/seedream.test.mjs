@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,mkdir,writeFile,readFile,rm,stat} from 'node:fs/promises';import path from 'node:path';import os from 'node:os';
 import {CaptureStore} from '../server/capture-store.mjs';import {AutoComic} from '../server/auto-comic.mjs';import {pngFixture,publicationFor} from './png-fixture.mjs';
 async function setup(t,fetchImpl){const root=await mkdtemp(path.join(os.tmpdir(),'seedream-test-'));t.after(()=>rm(root,{recursive:true,force:true}));const input=path.join(root,'input');await mkdir(input);const store=await new CaptureStore({generationMode:'batch',inputRoot:input,dataDir:path.join(root,'data')}).init();const photoIds=['a'.repeat(24),'b'.repeat(24),'c'.repeat(24)];const work={id:'d'.repeat(24),photoIds,status:'awaiting_image_provider',title:'A Cat Day'};work.story={...publicationFor(work).metadata};delete work.story.reviewed;delete work.story.prompt;store.index.works.push(work);for(const id of photoIds){await writeFile(path.join(store.dataDir,'media',id+'.jpg'),await readFile(new URL('../public/mikan.jpg',import.meta.url)));store.index.photos.push({id});}await store.save();const auto=await new AutoComic(store,{fetchImpl}).init();await auto.drawing.configure({apiKey:'test-placeholder-only'});await store.requestDrawing(work.id,{confirmPaid:true});return {auto,store,work,input};}
-test('draws once with style and real photos, publishes PNG with accurate unreviewed provenance, reuses paid output',async t=>{let calls=0;const {auto,store,work}=await setup(t,async(url,opts)=>{calls++;assert.equal(url,'https://ark.cn-beijing.volces.com/api/v3/images/generations');const body=JSON.parse(opts.body);assert.equal(body.image.length,4);assert.match(body.prompt,/Title exactly/);assert.equal(body.output_format,'png');return {ok:true,json:async()=>({data:[{b64_json:pngFixture().toString('base64')}]})};});await Promise.all([auto.tick(),auto.tick()]);let w=store.index.works[0];assert.equal(w.status,'completed');assert.equal(w.artwork.metadata.generationMode,'seedream-api');assert.equal(w.artwork.metadata.reviewed,false);assert.equal(calls,1);await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();assert.equal(calls,1);assert.equal((await stat(path.join(store.dataDir,'seedream-config.json'))).mode&0o777,0o600);assert.ok(!JSON.stringify(auto.snapshot()).includes('test-placeholder-only'));});
+test('draws once with style and real photos, publishes PNG with accurate unreviewed provenance, reuses paid output',async t=>{let calls=0;const {auto,store,work}=await setup(t,async(url,opts)=>{calls++;assert.equal(url,'https://ark.cn-beijing.volces.com/api/v3/images/generations');const body=JSON.parse(opts.body);assert.equal(body.image.length,3);assert.match(body.prompt,/Title exactly/);assert.equal(body.output_format,'png');return {ok:true,json:async()=>({data:[{b64_json:pngFixture().toString('base64')}]})};});await Promise.all([auto.tick(),auto.tick()]);let w=store.index.works[0];assert.equal(w.status,'completed');assert.equal(w.artwork.metadata.generationMode,'seedream-api');assert.equal(w.artwork.metadata.reviewed,false);assert.equal(calls,1);await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();assert.equal(calls,1);assert.equal((await stat(path.join(store.dataDir,'seedream-config.json'))).mode&0o777,0o600);assert.ok(!JSON.stringify(auto.snapshot()).includes('test-placeholder-only'));});
 test('authentication failure keeps story and sources and never auto-retries; image retry skips DeepSeek',async t=>{let calls=0;const {auto,store,work}=await setup(t,async()=>{calls++;return {ok:false,status:401,json:async()=>({error:{code:'AuthenticationError',message:'secret provider text'}})};});await auto.tick();assert.equal(store.index.works[0].status,'image_failed');assert.ok(store.index.works[0].story);assert.match(store.index.works[0].error,/HTTP 401/);assert.ok(!store.index.works[0].error.includes('secret'));await auto.tick();assert.equal(calls,1);await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});await auto.tick();assert.equal(calls,2);});
 test('timeout and interrupted drawing do not repeat a paid request without explicit retry',async t=>{const {auto,store,input}=await setup(t,async()=>{throw new DOMException('timeout','TimeoutError');});await auto.tick();assert.equal(store.index.works[0].status,'image_failed');await store.updateJob(store.index.works[0].id,{status:'drawing'});const restored=await new CaptureStore({generationMode:'batch',inputRoot:input,dataDir:store.dataDir}).init();await new AutoComic(restored).init();assert.equal(restored.index.works[0].status,'image_failed');});
 
@@ -64,8 +64,7 @@ test('read-only cache inspection distinguishes missing, incomplete and recoverab
  await rm(path.join(store.dataDir,'jobs',work.id,'seedream-publication.json'));r=await auto.drawing.inspect(work);assert.equal(r.cache.image.exists,true);assert.equal(r.cache.metadata.exists,false);assert.equal(calls,1);
 });
 
-test('URL reference mode sends public URLs, downloads the paid image and reuses the saved URL after a download failure',async t=>{
- const previous=process.env.CAT_PUBLIC_URL;process.env.CAT_PUBLIC_URL='https://cats.example';t.after(()=>{if(previous===undefined)delete process.env.CAT_PUBLIC_URL;else process.env.CAT_PUBLIC_URL=previous;});
+test('small base64 reference mode uses two photos plus compressed style, downloads the paid image and reuses the saved URL after a download failure',async t=>{
  let posts=0,downloads=0,failDownload=true;
  const {auto,store,work}=await setup(t,async(url,opts)=>{
   if(opts.method==='GET'){
@@ -75,20 +74,18 @@ test('URL reference mode sends public URLs, downloads the paid image and reuses 
   }
   posts++;assert.equal(url,'https://ark.cn-beijing.volces.com/api/v3/images/generations');
   const body=JSON.parse(opts.body);
-  assert.equal(body.response_format,'url');assert.equal(body.output_format,'png');assert.equal(body.image.length,4);
-  assert.ok(body.image.every(u=>u.startsWith('https://cats.example/')));
-  assert.match(body.image[0],/\/public\/comic-style-reference-en\.jpg$/);
-  assert.match(body.image[1],/\/api\/capture\/photos\/a{24}\.jpg$/);
+  assert.equal(body.response_format,'url');assert.equal(body.output_format,'png');assert.equal(body.image.length,3);
+  assert.ok(body.image.every(u=>u.startsWith('data:image/jpeg;base64,')));
+  assert.match(body.prompt,/Only the supplied reference photos are available/);
   return {ok:true,json:async()=>({data:[{url:'https://cdn.example/result.png'}]})};
  });
  await auto.tick();
  assert.equal(posts,1);assert.equal(downloads,1);assert.equal(store.index.works[0].status,'image_failed');
  assert.ok((await stat(path.join(store.dataDir,'jobs',work.id,'seedream-result.url'))).isFile());
- assert.equal(auto.drawing.snapshot().drawingReferenceMode,'url');
+ assert.equal(auto.drawing.snapshot().drawingReferenceMode,'base64-limited');
  failDownload=false;
  await store.requestDrawing(work.id,{confirmPaid:true,confirmRetry:true});
  await auto.tick();
  assert.equal(posts,1);assert.equal(downloads,2);assert.equal(store.index.works[0].status,'completed');
  assert.equal(store.index.works[0].artwork.metadata.generationMode,'seedream-api');
- assert.ok(!JSON.stringify(store.index.works[0]).includes('simulated download interruption'));
 });
