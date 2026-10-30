@@ -17,7 +17,7 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 - `docs/sessions/`：仅在用户要求 git 存档或 exit 时写会话日志。
 
 ## 当前状态
-- 活跃分支：`fix/seedream-small-base64`（待合并/部署）。云端到方舟的小请求正常（60KB约0.7秒），但12.4MB上行600秒未完成、约11MB回包180秒未完成；公网URL参考图又被方舟400 `InvalidParameter`拒绝。当前改为2张照片+压缩风格图的小体积Base64（约2.5MB）+url回包+1152×1536输出；真实付费验收待用户在网站点击测试。
+- 活跃分支：无。小体积Base64绘图已上线并经用户实测成功：10-29、10-28 两篇均为 completed，约2.5MB 请求、4分20秒/5分01秒、1152×1536 PNG；单次付费请求、失败重试复用已保存图片 URL。猫咪档案按用户确认改为 Xixi（蓝白）与 Didi（虎斑），补充“更活泼/更慵懒”的观察摘要，习惯页地图、图例、事件、摘要与问题同步；本轮合并 main 上线。
 - 已完成功能：工作台、观测筛选、双猫档案、事件复核、片段统计、四/六格模拟漫画编辑、审核、SVG 导出、作品库、本地素材导入与持久化、设置及 JSON 导出。
 - 新流程：相机压缩HTTPS直传、按摄像头及北京时间每日归档、次日00:10调度、目标6–8格英文总结漫画、只读素材预览、原图和PNG下载。旧批次暂停，已完成作品保留；review/studio导航仍暂停。新版每日真实成品尚待正式站验收。
 
@@ -133,3 +133,5 @@ Open Datalogger 阳台猫工作台。支持本地目录/SSH模式及服务器HTT
 | 2026-10-30 | feature/seedream-url-reference | 云端到方舟的多MB传输受限，改为公网URL参考图（风格图JPEG+8张照片URL）、`response_format=url`、独立下载与URL复用、日汇总输出1152×1536；76项测试、手动绘图及短延时传输模拟通过（310秒完整模拟为改动前结果），未付费调用。待合并推送后以`seedreamUrlReferenceVersion=1`和`drawingReferenceMode=url`核验，并由用户实测。 |
 
 | 2026-10-30 | fix/seedream-small-base64 | URL参考图被方舟400 InvalidParameter拒绝后，改为压缩风格图+2张照片的小体积Base64（约2.5MB）、url回包、独立下载与URL复用、1152×1536；76项测试通过，未付费调用。待部署后以`seedreamSmallReferenceVersion=1`和`drawingReferenceMode=base64-limited`核验。 |
+
+| 2026-10-30 | feature/cat-profiles-xixi-didi | 按用户确认把猫咪档案改为 Xixi（蓝白，Wikimedia Commons）与 Didi（虎斑），补充“Xixi 更活泼、Didi 更慵懒”的观察摘要；习惯页地图/图例/事件/摘要/问题同步，旧本地状态自动迁移；76项测试通过，用户预览确认后合并 main 上线。 |
